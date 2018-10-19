@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/store/tikv"
 )
