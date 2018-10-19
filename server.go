@@ -113,7 +113,7 @@ func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
 			errorResponse(c, "can not parse nano second time")
 			return
 		}
-		if metricTime < 1000000000000 || metricTime > 9000000000000 {
+		if metricTime < 1000000000000000 || metricTime > 9000000000000000 {
 			errorResponse(c, "bad time range")
 			return
 		}
