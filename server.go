@@ -33,7 +33,7 @@ const (
 	KeysMetric
 )
 
-func encodeKey(metricType MetricType, metricId []byte, subtype int8, time int64) (result []byte) {
+func EncodeKey(metricType MetricType, metricId []byte, subtype int8, time int64) (result []byte) {
 	sep := []byte("_")
 	timeBuffer := make([]byte, binary.MaxVarintLen64)
 	binary.PutVarint(timeBuffer, time)
@@ -59,7 +59,7 @@ func encodeKey(metricType MetricType, metricId []byte, subtype int8, time int64)
 	log.Printf("encode key: %+v, %s", result, string(result))
 	return
 }
-func decodeKey(key []byte) (metricType MetricType, metricId []byte, subtype int8, time int64) {
+func DecodeKey(key []byte) (metricType MetricType, metricId []byte, subtype int8, time int64) {
 	length := len(key)
 	prefix := key[:2]
 	switch string(prefix) {
@@ -119,7 +119,7 @@ func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
 		}
 
 		// generate keys
-		key := encodeKey(ValueDataMetric, []byte(metricId), RawResolution, metricTime)
+		key := EncodeKey(ValueDataMetric, []byte(metricId), RawResolution, metricTime)
 
 		// receive body -> decode json -> encode msgPack
 		buf := make([]byte, 4096)
@@ -137,7 +137,7 @@ func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
 		err = rawKvClient.Put(key, packedValue)
 
 		// write keys info
-		keysInfoMetricKey := encodeKey(KeysMetric, []byte(metricId), 0, 0)
+		keysInfoMetricKey := EncodeKey(KeysMetric, []byte(metricId), 0, 0)
 		err2 := rawKvClient.Put(keysInfoMetricKey, []byte{0})
 		if err != nil || err2 != nil {
 			log.Printf("%+v\n", err)
@@ -181,21 +181,25 @@ func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
 		}
 		limitStr := c.Query("limit")
 		limit := 1000
-		if upperStr != "" {
-			upper, err = strconv.ParseInt(limitStr, 10, 64)
+		if limitStr != "" {
+			limit64, err := strconv.ParseInt(limitStr, 10, 64)
+			limit = int(limit64)
 			if err != nil {
 				errorResponse(c, "invalid limit")
 				return
 			}
 		}
 
-		startKey := encodeKey(ValueDataMetric, targetId, RawResolution, lower)
+		startKey := EncodeKey(ValueDataMetric, targetId, RawResolution, lower)
 		keys, values, _ := rawKvClient.Scan(startKey, limit)
 		log.Printf("fond %v\n", len(keys))
 
 		var responseRows []Row
 		for i := range keys {
-			_, metricId, _, time := decodeKey(keys[i])
+			metricType, metricId, resolution, time := DecodeKey(keys[i])
+			if metricType != ValueDataMetric || resolution != RawResolution {
+				break
+			}
 			if !bytes.Equal(metricId, targetId) {
 				break
 			}
@@ -214,6 +218,35 @@ func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
 		}
 		c.JSON(200, res)
 	})
+
+	r.GET("/metric/keys", func(c *gin.Context) {
+		limitStr := c.Query("limit")
+		limit := 1000
+		if limitStr != "" {
+			limit64, err := strconv.ParseInt(limitStr, 10, 64)
+			limit = int(limit64)
+			if err != nil {
+				errorResponse(c, "invalid limit")
+				return
+			}
+		}
+		startKey := EncodeKey(KeysMetric, []byte{0}, 0, 0)
+		keys, _, err := rawKvClient.Scan(startKey, limit)
+		if err != nil {
+			errorResponse(c, "cannot read db")
+			return
+		}
+		var metricKeys []string
+		for i := range keys {
+			metricType, metricId, subtype, _ := DecodeKey(keys[i])
+			if metricType != KeysMetric || subtype != 0 {
+				break
+			}
+			metricKeys = append(metricKeys, string(metricId))
+		}
+		c.JSON(200, metricKeys)
+	})
+
 	return r
 }
 

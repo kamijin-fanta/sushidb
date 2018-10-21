@@ -1,4 +1,4 @@
-module github.com/kamijin-fanta/tikv-sandbox
+module github.com/kamijin-fanta/sushidb
 
 require (
 	github.com/0xAX/notificator v0.0.0-20171022182052-88d57ee9043b // indirect
