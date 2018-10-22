@@ -1,4 +1,5 @@
 gin-bin*
 sushidb*
+!sushidb-ui
 .env
 rice-box.go
