@@ -30,12 +30,18 @@ export default {
 </script>
 
 <style>
-
 #app {
   font-family: 'Yu Gothic Medium', YuGothic, YuGothic M, meiryo, Helvetica Neue, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
+}
+#app .view {
+  margin: 2rem;
+}
+
+#app .view h1 {
+  margin: 1rem 0;
 }
 </style>
