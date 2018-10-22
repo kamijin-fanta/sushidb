@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"log"
 	"os"
@@ -26,6 +27,8 @@ func main() {
 
 	fmt.Printf("cluster ID: %d\n", cli.ClusterID())
 
-	serverHandle := Server(cli)
-	serverHandle.Run()
+	r := gin.Default()
+	ApiServer(r, cli)
+	UiServer(r)
+	r.Run()
 }

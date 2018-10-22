@@ -77,8 +77,7 @@ func DecodeKey(key []byte) (metricType MetricType, metricId []byte, subtype int8
 	return
 }
 
-func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
-	r := gin.Default()
+func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 	r.GET("/ping", func(c *gin.Context) {
 
 		var input = []byte(`{"hoge": 123, "fuga": true}`)
@@ -246,8 +245,6 @@ func Server(rawKvClient *tikv.RawKVClient) *gin.Engine {
 		}
 		c.JSON(200, metricKeys)
 	})
-
-	return r
 }
 
 type MetricResponse struct {
