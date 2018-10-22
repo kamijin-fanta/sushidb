@@ -1,17 +1,20 @@
 <template>
   <div id="app">
-    {{store.counter}}
+    <app-header></app-header>
     <router-view class="view"></router-view>
-    <button @click="incr()">incr</button>
+    <!-- {{store.counter}}
+    <button @click="incr()">incr</button> -->
   </div>
 </template>
 
 <script>
 import { store } from './store'
+import AppHeader from './components/AppHeader'
 
 export default {
   name: 'app',
   components: {
+    AppHeader,
   },
   data () {
     return {
@@ -27,12 +30,12 @@ export default {
 </script>
 
 <style>
+
 #app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: 'Yu Gothic Medium', YuGothic, YuGothic M, meiryo, Helvetica Neue, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
 }
 </style>
