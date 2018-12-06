@@ -1,0 +1,17 @@
+{
+  "extends": "react-app",
+  "plugins": [
+    "react",
+    "prettier",
+    "jest"
+  ],
+  "env": {
+    "browser": true,
+    "es6": true,
+    "jest/globals": true
+  },
+  "rules": {
+    "prettier/prettier": "warn",
+    "no-unused-vars": "warn"
+  }
+}

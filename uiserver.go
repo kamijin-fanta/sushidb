@@ -21,7 +21,7 @@ func UiServer(r *gin.Engine) {
 
 func DevProxy() gin.HandlerFunc {
 	// https://stackoverflow.com/a/39009974
-	target := "localhost:8080"
+	target := "localhost:3005"
 	return func(c *gin.Context) {
 		director := func(req *http.Request) {
 			r := c.Request
