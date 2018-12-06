@@ -17,19 +17,19 @@ func main() {
 
 	fmt.Printf("cluster ID: %d\n", cli.ClusterID())
 
-	key := []byte("tikv")
-	val := []byte("fooo")
+	//key := []byte("tikv")
+	//val := []byte("fooo")
+	//
+	//val, err = cli.Get(key)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//fmt.Printf("found val: %s for key: %s\n", val, key)
 
-	val, err = cli.Get(key)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("found val: %s for key: %s\n", val, key)
-
-	keys, values, _ := cli.Scan([]byte{0}, 10)
+	keys, values, _ := cli.ReverseScan([]byte{255, 255, 255, 255, 255, 255, 255, 255, 255}, 10)
 	for i := range keys {
-		fmt.Printf("found scan key: %s Value %s\n", keys[i], values[i])
+		fmt.Printf("found scan key: %s Value %s / HexKey: %x\n", keys[i], values[i], keys[i])
 		//cli.Delete(keys[i])
 	}
 }

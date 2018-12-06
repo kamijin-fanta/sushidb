@@ -35,8 +35,8 @@ const (
 
 func EncodeKey(metricType MetricType, metricId []byte, subtype int8, time int64) (result []byte) {
 	sep := []byte("_")
-	timeBuffer := make([]byte, binary.MaxVarintLen64)
-	binary.PutVarint(timeBuffer, time)
+	timeBuffer := make([]byte, 8)
+	binary.BigEndian.PutUint64(timeBuffer, uint64(time))
 
 	var prefix []byte
 	switch metricType {
@@ -70,10 +70,11 @@ func DecodeKey(key []byte) (metricType MetricType, metricId []byte, subtype int8
 	default:
 		log.Fatalf("undefined metric type: %s\n", string(prefix))
 	}
-	timeBuffer := key[length-binary.MaxVarintLen64:]
-	time, _ = binary.Varint(timeBuffer)
-	subtype = int8(key[length-binary.MaxVarintLen64-2])
-	metricId = key[3 : length-binary.MaxVarintLen64-3]
+	timeLength := 8
+	timeBuffer := key[length-timeLength:]
+	time = int64(binary.BigEndian.Uint64(timeBuffer))
+	subtype = int8(key[length-timeLength-2])
+	metricId = key[3 : length-timeLength-3]
 	return
 }
 
