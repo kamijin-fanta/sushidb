@@ -190,8 +190,28 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 			}
 		}
 
-		startKey := EncodeKey(ValueDataMetric, targetId, RawResolution, lower)
-		keys, values, _ := rawKvClient.Scan(startKey, limit)
+		sortStr := c.Query("sort")
+		reverse := true
+		if sortStr == "desc" || sortStr == "" {
+			reverse = true
+		} else if sortStr == "asc" {
+			reverse = false
+		} else {
+			errorResponse(c, "invalid sort")
+			return
+		}
+
+		var keys [][]byte
+		var values [][]byte
+
+		if reverse {
+			startKey := EncodeKey(ValueDataMetric, targetId, RawResolution, upper)
+			keys, values, _ = rawKvClient.ReverseScan(startKey, limit)
+		} else {
+			startKey := EncodeKey(ValueDataMetric, targetId, RawResolution, lower)
+			keys, values, _ = rawKvClient.Scan(startKey, limit)
+		}
+
 		log.Printf("fond %v\n", len(keys))
 
 		var responseRows []Row
@@ -208,7 +228,7 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 			}
 
 			var unpacked interface{}
-			msgpack.Unmarshal(values[i], &unpacked)
+			_ = msgpack.Unmarshal(values[i], &unpacked)
 			responseRows = append(responseRows, Row{Time: time, Value: unpacked})
 		}
 
