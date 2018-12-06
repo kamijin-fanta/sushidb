@@ -27,7 +27,7 @@ func main() {
 	//
 	//fmt.Printf("found val: %s for key: %s\n", val, key)
 
-	keys, values, _ := cli.ReverseScan([]byte{255, 255, 255, 255, 255, 255, 255, 255, 255}, 10)
+	keys, values, _ := cli.ReverseScan([]byte{255, 255, 255, 255, 255, 255, 255, 255, 255}, 30)
 	for i := range keys {
 		fmt.Printf("found scan key: %s Value %s / HexKey: %x\n", keys[i], values[i], keys[i])
 		//cli.Delete(keys[i])

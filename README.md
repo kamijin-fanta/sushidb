@@ -14,7 +14,7 @@ gin
 
 ### GET /cluster
 
-### POST /metric/single/:id/:time
+### POST /metric/{single|message}/:id/:time
 
 - id: key name (example: hoge)
 - time: nano second time (example: 1544068003882000)
@@ -25,7 +25,7 @@ $ curl -XPOST localhost:3000/metric/single/hoge/1544068003882000 -d '{"app": "ho
 {"ok":1}
 ```
 
-### GET /metric/single/:id?lower={ns_time}&upper={ns_time}&limit={num}&sort={asc|desc}
+### GET /metric/{single|message}/:id?lower={ns_time}&upper={ns_time}&limit={num}&sort={asc|desc}
 
 - id: key name
   - format: string
@@ -60,10 +60,54 @@ $ curl localhost:3000/metric/single/hoge
 }
 ```
 
-### GET /metric/keys
+### GET /keys/{single|message}/
 
 ## UI
 
 ```bash
 $ chrome localhost:3000/ui 
 ```
+
+## キー設計
+
+- フォーマット
+  - `[prefix 2bytes]_[metricId some bytes]_[subtype 1 byte]_[time ns 8 bytes]`
+  - 各項目はアンダーバー(0x5f)で区切る
+- prefix: 値の種別・バージョンが入る
+- metricId: キー名などが入る
+- subtype: 圧縮後の解像度など、該当のキーへの補助的な種別が入る
+- time: ビッグエンディアンのint64値として、ナノ秒を格納する
+
+
+### Prefix
+
+#### s1
+
+- 値を格納する
+- subtype: Resolution
+- body: msgpackでマーシャルされた単一の値
+
+#### m1
+
+- メッセージを格納する
+- subtype: Resolution
+- body: msgpackでマーシャルされた値
+
+#### k1
+
+- キーのリストを格納する
+- subtype: prefix type
+  - 0: v1
+  - 1: m1
+- body: empty
+
+
+### Subtype
+
+#### Resolution
+
+- 0: 生
+- 1: 解像度を維持しつつデータ数を抑える
+- 2: 1分毎に丸める
+- 3: 1時間毎に丸める
+- 4: 1日毎に丸める
