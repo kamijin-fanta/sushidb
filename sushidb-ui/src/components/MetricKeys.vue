@@ -21,7 +21,11 @@ export default {
   },
   computed: {
     tableData () {
-      return this.keys.map((value, index) => ({ id: index + 1, key: value }))
+      return this.keys.map((value, index) => ({
+        id: index + 1,
+        key: value.metric_id,
+        type: value.type,
+      }))
     }
   },
   data () {
@@ -29,7 +33,8 @@ export default {
       keys: [],
       tableColumns: [
         { title: '#', key: 'id'},
-        { title: 'Metric Key', key: 'key'},
+        { title: 'Metric Key', key: 'key' },
+        { title: 'Type', key: 'type' },
         {
           title: 'Operation',
           render: (h, params) => {
@@ -45,6 +50,14 @@ export default {
                 on: {
                   click: () => {
                     console.log('view', params)
+                    switch (params.item.type) {
+                      case 'message':
+                        this.$router.push({ name: 'message-query', params: { metric_id: params.item.key }});
+                        break;
+                      case 'single':
+                        this.$router.push({ name: 'single-query', params: { metric_id: params.item.key }});
+                        break;
+                    }
                   }
                 }
               }, 'View Metrics'),
@@ -56,7 +69,7 @@ export default {
   },
   methods: {
     fetch() {
-      fetch('/metric/keys')
+      fetch(`/keys`)
         .then(res => res.json())
         .then(res => { this.keys = res })
     }
@@ -65,4 +78,7 @@ export default {
 </script>
 
 <style scoped>
+.selection {
+  margin: 2rem 0;
+}
 </style>

@@ -11,6 +11,7 @@ Vue.config.productionTip = false
 import Home from './components/Home.vue'
 import HelloWorld from './components/HelloWorld.vue'
 import MetricKeys from './components/MetricKeys.vue'
+import QuerySingle from './components/QuerySingle.vue'
 
 Vue.use(VueRouter)
 const router = new VueRouter({
@@ -21,6 +22,7 @@ const router = new VueRouter({
     { path: '/home', name: 'home', component: Home },
     { path: '/hello', name: 'hello', component: HelloWorld },
     { path: '/metric/keys', name: 'metric-keys', component: MetricKeys },
+    { path: '/metric/single/:metric_id', name: 'single-query', component: QuerySingle },
   ]
 })
 
