@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
-	"github.com/pingcap/tidb/store/tikv"
-	"github.com/vmihailenco/msgpack"
 	"log"
 	"math"
 	"strconv"
@@ -35,15 +32,15 @@ const (
 )
 
 // Prefix Types
-type MetricType int
+type PrefixTypes int
 
 const (
-	PrefixSingleValueMetric MetricType = iota
+	PrefixSingleValueMetric PrefixTypes = iota
 	PrefixMessageDataMetric
 	PrefixKeysMetric
 )
 
-func EncodeKey(metricType MetricType, metricId []byte, subtype int8, time int64) (result []byte) {
+func EncodeKey(metricType PrefixTypes, metricId []byte, subtype int8, time int64) (result []byte) {
 	sep := []byte("_")
 	timeBuffer := make([]byte, 8)
 	binary.BigEndian.PutUint64(timeBuffer, uint64(time))
@@ -71,7 +68,7 @@ func EncodeKey(metricType MetricType, metricId []byte, subtype int8, time int64)
 	log.Printf("encode key: %+v, %s", result, string(result))
 	return
 }
-func DecodeKey(key []byte) (metricType MetricType, metricId []byte, subtype int8, time int64) {
+func DecodeKey(key []byte) (metricType PrefixTypes, metricId []byte, subtype int8, time int64) {
 	length := len(key)
 	prefix := key[:2]
 	switch string(prefix) {
@@ -92,24 +89,9 @@ func DecodeKey(key []byte) (metricType MetricType, metricId []byte, subtype int8
 	return
 }
 
-func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
+func ApiServer(r *gin.Engine, store *Store) {
 	/********** PING **********/
 	r.GET("/ping", func(c *gin.Context) {
-
-		var input = []byte(`{"hoge": 123, "fuga": true}`)
-		var str interface{}
-		err := json.Unmarshal(input, &str)
-		if err != nil {
-			errorResponse(c, "invalid json")
-			return
-		}
-		b, _ := msgpack.Marshal(str)
-		log.Printf("====> %v\n", str)
-		log.Printf("====> %x\n", b)
-		msgpack.Unmarshal(b, str)
-		a, _ := json.Marshal(str)
-		log.Printf("====> %s\n", string(a))
-
 		c.JSON(200, gin.H{
 			"message": "pong",
 		})
@@ -118,13 +100,14 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 	/********** Cluster Info **********/
 	r.GET("/cluster", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"cluster": rawKvClient.ClusterID(),
+			"cluster": store.rawKvClient.ClusterID(),
 		})
 	})
 
 	/********** PostMetrics **********/
 	r.POST("/metric/:type/:id/:time", func(c *gin.Context) {
 		metricId := c.Param("id")
+		metricIdBytes := []byte(metricId)
 		metricTimeStr := c.Param("time")
 
 		metricTime, err := strconv.ParseInt(metricTimeStr, 10, 64)
@@ -153,46 +136,26 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 			return
 		}
 
-		var writeValueError error
-		var writeKeyInfoError error
+		var writeError error
 
+		// write value
 		switch metricType {
 		case MetricSingle:
 			floatValue, success := receiveJson.(float64)
 			if !success {
 				errorResponse(c, "invalid body. You can post a numerical value.")
 			}
-
-			// encode msgPack
-			packedValue, _ := msgpack.Marshal(floatValue)
-
-			// write value
-			key := EncodeKey(PrefixSingleValueMetric, []byte(metricId), SubRawResolution, metricTime)
-			writeValueError = rawKvClient.Put(key, packedValue)
-
-			// write keys info
-			keysInfoMetricKey := EncodeKey(PrefixKeysMetric, []byte(metricId), SubSingleKeys, 0)
-			writeKeyInfoError = rawKvClient.Put(keysInfoMetricKey, []byte{0})
+			writeError = store.PutSingleMetric(metricIdBytes, metricTime, SubRawResolution, floatValue)
 
 			break
 		case MetricMessage:
-			// encode msgPack
-			packedValue, _ := msgpack.Marshal(receiveJson)
-
-			// write value
-			key := EncodeKey(PrefixMessageDataMetric, []byte(metricId), SubRawResolution, metricTime)
-			writeValueError = rawKvClient.Put(key, packedValue)
-
-			// write keys info
-			keysInfoMetricKey := EncodeKey(PrefixKeysMetric, []byte(metricId), SubMessageKeys, 0)
-			writeKeyInfoError = rawKvClient.Put(keysInfoMetricKey, []byte{0})
+			writeError = store.PutMessageMetric(metricIdBytes, metricTime, SubRawResolution, receiveJson)
 			break
 		}
 
 		// display errors
-		if writeValueError != nil || writeKeyInfoError != nil {
-			log.Printf("%+v\n", writeValueError)
-			log.Printf("%+v\n", writeKeyInfoError)
+		if writeError != nil {
+			log.Printf("%+v\n", writeError)
 			errorResponse(c, "can not write storage")
 			return
 		}
@@ -204,28 +167,19 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 
 	/********** Query Metrics **********/
 	r.GET("/metric/:type/:id", func(c *gin.Context) {
-		targetIdStr := c.Param("id")
-		if targetIdStr == "" {
-			errorResponse(c, "invalid metric id")
-			return
-		}
-		targetId := []byte(targetIdStr)
-
 		var err error
 		metricType, err := parseMetricType(c)
 		if err != nil {
 			errorResponse(c, "bad metric type")
 			return
 		}
-		var prefix MetricType
-		switch metricType {
-		case MetricSingle:
-			prefix = PrefixSingleValueMetric
-			break
-		case MetricMessage:
-			prefix = PrefixMessageDataMetric
-			break
+
+		targetIdStr := c.Param("id")
+		if targetIdStr == "" {
+			errorResponse(c, "invalid metric id")
+			return
 		}
+		targetId := []byte(targetIdStr)
 
 		lowerStr := c.Query("lower")
 		lower := int64(0)
@@ -268,37 +222,25 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 			return
 		}
 
-		var keys [][]byte
-		var values [][]byte
+		var rows []SingleMetricResponseRow
+		var fetchErr error
 
-		if reverse {
-			startKey := EncodeKey(prefix, targetId, SubRawResolution, upper)
-			keys, values, _ = rawKvClient.ReverseScan(startKey, limit)
-		} else {
-			startKey := EncodeKey(prefix, targetId, SubRawResolution, lower)
-			keys, values, _ = rawKvClient.Scan(startKey, limit)
+		switch metricType {
+		case MetricSingle:
+			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, SubRawResolution, reverse)
+			break
+		case MetricMessage:
+			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, SubRawResolution, reverse)
+			break
 		}
-
-		log.Printf("fond %v\n", len(keys))
-
-		var responseRows []Row
-		for i := range keys {
-			metricType, metricId, resolution, time := DecodeKey(keys[i])
-			if metricType != prefix || !bytes.Equal(metricId, targetId) || resolution != SubRawResolution {
-				break
-			}
-			if time > upper { // out of range
-				break
-			}
-
-			var unpacked interface{}
-			_ = msgpack.Unmarshal(values[i], &unpacked)
-			responseRows = append(responseRows, Row{Time: time, Value: unpacked})
+		if fetchErr != nil {
+			errorResponse(c, "fetch error")
+			return
 		}
 
 		res := MetricResponse{
 			MetricId: string(targetId),
-			Rows:     responseRows,
+			Rows:     rows,
 		}
 		c.JSON(200, res)
 	})
@@ -316,49 +258,38 @@ func ApiServer(r *gin.Engine, rawKvClient *tikv.RawKVClient) {
 			}
 		}
 
-		startKey := EncodeKey(PrefixKeysMetric, []byte{0}, 0, 0)
-
-		keys, _, err := rawKvClient.Scan(startKey, limit)
+		metricKeys, err := store.FetchKeys([]byte{0}, limit)
 		if err != nil {
-			errorResponse(c, "cannot read db")
+			errorResponse(c, "invalid sort")
 			return
 		}
-		metricKeys := make([]Key, 0)
-		for i := range keys {
-			metricType, metricId, subtypeId, _ := DecodeKey(keys[i])
-			log.Printf("%+v / %+v / %+v\n", metricType, string(metricId), subtypeId)
-			if metricType != PrefixKeysMetric {
-				break
-			}
-			var subtype string
-			switch subtypeId {
-			case SubMessageKeys:
-				subtype = "message"
-				break
-			case SubSingleKeys:
-				subtype = "single"
-				break
-			}
-			metricKeys = append(metricKeys, Key{
-				MetricId: string(metricId),
-				Type:     subtype,
-			})
-		}
 		c.JSON(200, metricKeys)
+	})
+
+	/********** PD List **********/
+	r.GET("/pd/", func(c *gin.Context) {
+		res := store.GetPdList()
+		c.JSON(200, res)
+	})
+
+	/********** PD Infos **********/
+	r.GET("/pd/api/*any", func(c *gin.Context) {
+		res, err := store.PdRequest(c.Request.URL.Path)
+		if err != nil {
+			errorResponse(c, err.Error())
+			return
+		}
+
+		c.Writer.Header().Set("Content-Type","application/json")
+		c.Writer.Header().Set("Content-Length", strconv.Itoa(len(res)))
+		c.Writer.WriteHeader(200)
+		c.Writer.Write(res)
 	})
 }
 
 type MetricResponse struct {
-	MetricId string `json:"metric_id"`
-	Rows     []Row  `json:"rows"`
-}
-type Row struct {
-	Time  int64       `json:"time"`
-	Value interface{} `json:"value"`
-}
-type Key struct {
-	MetricId string `json:"metric_id"`
-	Type     string `json:"type"`
+	MetricId string                    `json:"metric_id"`
+	Rows     []SingleMetricResponseRow `json:"rows"`
 }
 
 const (

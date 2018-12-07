@@ -12,6 +12,7 @@ export function queryString(query = {}) {
   return "";
 }
 
+/********** SushiDB API **********/
 export function fetchKeys() {
   return fetch(`${API_BASE}/keys`);
 }
@@ -24,23 +25,38 @@ export function fetchMessageMetric(metricId, options = {}) {
   return fetch(`${API_BASE}/metric/message/${metricId}${queryString(options)}`);
 }
 
+/********** PD API **********/
+export function fetchPdList() {
+  return fetch(`${API_BASE}/pd/`);
+}
+export function fetchStoreList() {
+  return fetch(`${API_BASE}/pd/api/v1/stores`);
+}
+
 export function useResource(fn, defaultValue, dependency = []) {
   const [body, setBody] = React.useState(defaultValue);
+  const [isLoading, setLoading] = React.useState(false);
 
   async function refresh() {
-    setBody(defaultValue);
+    setLoading(true);
     const res = await fn();
     const json = await res.json();
     setBody(json);
+    setLoading(false);
+  }
+  async function clearAndRefresh() {
+    setBody(defaultValue);
+    await refresh();
   }
 
   React.useEffect(() => {
-    refresh();
+    clearAndRefresh();
     return () => {};
   }, dependency);
 
   return {
     body,
-    refresh
+    refresh,
+    isLoading
   };
 }

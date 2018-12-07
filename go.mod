@@ -17,6 +17,7 @@ require (
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/mattn/go-shellwords v1.0.3 // indirect
 	github.com/pingcap/kvproto v0.0.0-20181105061835-1b5d69cd1d26
+	github.com/pingcap/pd v2.1.0-rc.4+incompatible
 	github.com/pingcap/tidb v2.1.0-rc.2+incompatible
 	github.com/pkg/errors v0.9.0 // indirect
 	github.com/vmihailenco/msgpack v4.0.0+incompatible

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/pingcap/pd/client"
 	"log"
 	"os"
 	"strings"
@@ -19,16 +20,28 @@ func main() {
 	}
 	pdAddress := os.Getenv("PD_ADDRESS")
 
-	cli, err := tikv.NewRawKVClient(strings.Split(pdAddress, ","), config.Security{})
+	addressList := strings.Split(pdAddress, ",")
+	rawClient, err := tikv.NewRawKVClient(addressList, config.Security{})
 	if err != nil {
 		panic(err)
 	}
-	defer cli.Close()
+	defer rawClient.Close()
 
-	fmt.Printf("cluster ID: %d\n", cli.ClusterID())
+	pdClient, err := pd.NewClient(addressList, pd.SecurityOption{})
+	if err != nil {
+		panic(err)
+	}
+	defer pdClient.Close()
+
+	store := Store{
+		rawKvClient: *rawClient,
+		pbClient:    pdClient,
+	}
+
+	fmt.Printf("cluster ID: %d\n", rawClient.ClusterID())
 
 	r := gin.Default()
-	ApiServer(r, cli)
+	ApiServer(r, &store)
 	UiServer(r)
 	r.Run()
 }
