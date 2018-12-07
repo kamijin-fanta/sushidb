@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 )
 
 func UiServer(r *gin.Engine) {
@@ -16,6 +17,7 @@ func UiServer(r *gin.Engine) {
 	} else {
 		//r.Static("/ui", "./assets")
 		r.GET("/ui/*any", DevProxy())
+		r.GET("/static/*any", DevProxy())
 	}
 }
 
@@ -26,6 +28,7 @@ func DevProxy() gin.HandlerFunc {
 		director := func(req *http.Request) {
 			r := c.Request
 			req.URL = r.URL
+			req.URL.Path = strings.Replace(r.URL.Path, "/ui", "", -1)
 			req.URL.Scheme = "http"
 			req.URL.Host = target
 		}

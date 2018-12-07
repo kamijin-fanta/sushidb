@@ -1,19 +1,27 @@
 .header {
   display: flex;
   justify-content: space-between;
-  font-size: 1.3rem;
   border-bottom: 1px solid #e2ecf4;
   padding: 0 2rem;
 }
 
-.header .title {}
+.header .title {
+  font-size: 1.3rem;
+}
 .header .links {
   display: flex;
+  height: 50px;
 }
 
 .header a {
   color: #6582c7;
   text-decoration: none;
-  padding: 1rem;
+  padding: 0 1rem;
   display: inline-block;
+  height: 100%;
+  line-height: 50px;
+}
+.header .links a.active {
+  border-bottom: 4px solid;
+  box-sizing: border-box;
 }

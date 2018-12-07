@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import "./Header.css";
 
@@ -8,18 +8,12 @@ export function Header() {
   return (
     <div className="header">
       <div className="title">
-        <Link to="/">SushiDB</Link>
+        <NavLink to="/">SushiDB</NavLink>
       </div>
       <div className="links">
-        <div>
-          <Link to="/">SushiDB</Link>
-        </div>
-        <div>
-          <a href="#">View</a>
-        </div>
-        <div>
-          <a href="#">Write</a>
-        </div>
+        <NavLink to="/" exact>SushiDB</NavLink>
+        <NavLink to="/keys">View</NavLink>
+        <a href="#">Write</a>
       </div>
     </div>
   );

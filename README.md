@@ -60,7 +60,7 @@ $ curl localhost:3000/metric/single/hoge
 }
 ```
 
-### GET /keys/{single|message}/
+### GET /keys/
 
 ## UI
 
