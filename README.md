@@ -5,7 +5,7 @@
 ```
 go mod download
 go get github.com/codegangsta/gin
-gin
+gin --port 3006
 ```
 
 ## API

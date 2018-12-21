@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/kamijin-fanta/sushidb/querying"
+	"io"
 	"log"
 	"math"
 	"strconv"
@@ -245,6 +248,81 @@ func ApiServer(r *gin.Engine, store *Store) {
 		c.JSON(200, res)
 	})
 
+	r.POST("/query/:type/:id", func(c *gin.Context) {
+		metricType, err := parseMetricType(c)
+		if err != nil {
+			errorResponse(c, "bad metric type")
+			return
+		}
+
+		targetIdStr := c.Param("id")
+		if targetIdStr == "" {
+			errorResponse(c, "invalid metric id")
+			return
+		}
+		targetId := []byte(targetIdStr)
+
+		var rows []SingleMetricResponseRow
+		var fetchErr error
+
+		buf := new(bytes.Buffer)
+		_, err = io.Copy(buf, c.Request.Body)
+		if err != nil {
+			errorResponse(c, "cannot request body")
+			return
+		}
+		postData := buf.Bytes()
+
+		query, err := querying.New(postData)
+		if err != nil {
+			errorResponse(c, "invalid query jsondata")
+			return
+		}
+
+		reverse := true
+		switch query.Query.Sort {
+		case "desc":
+		case "":
+			reverse = true
+			break
+		default:
+			errorResponse(c, "invalid sort")
+			return
+		}
+
+		switch metricType {
+		case MetricSingle:
+			rows, fetchErr = store.FetchSingleMetric(targetId, query.Query.Lower, query.Query.Upper, query.Query.Limit, SubRawResolution, reverse)
+			break
+		case MetricMessage:
+			rows, fetchErr = store.FetchMessageMetric(targetId, query.Query.Lower, query.Query.Upper, query.Query.Limit, SubRawResolution, reverse)
+			break
+		}
+		if fetchErr != nil {
+			errorResponse(c, "fetch error")
+			return
+		}
+
+		filteredRes := make([]SingleMetricResponseRow, 0)
+
+		for _, row := range rows {
+			condition, err := query.FilterRow(row.Value)
+			if err != nil {
+				errorResponse(c, "query error"+err.Error())
+				return
+			}
+			if condition {
+				filteredRes = append(filteredRes, row)
+			}
+		}
+
+		res := MetricResponse{
+			MetricId: string(targetId),
+			Rows:     filteredRes,
+		}
+		c.JSON(200, res)
+	})
+
 	/********** Query Keys **********/
 	r.GET("/keys", func(c *gin.Context) {
 		limitStr := c.Query("limit")
@@ -280,7 +358,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 			return
 		}
 
-		c.Writer.Header().Set("Content-Type","application/json")
+		c.Writer.Header().Set("Content-Type", "application/json")
 		c.Writer.Header().Set("Content-Length", strconv.Itoa(len(res)))
 		c.Writer.WriteHeader(200)
 		c.Writer.Write(res)
