@@ -15,6 +15,11 @@ function genLink(key) {
     ? `/metric/message/${key.metric_id}`
     : `/metric/single/${key.metric_id}`;
 }
+function genQueryLink(key) {
+  return key.type === "message"
+    ? `/query/message/${key.metric_id}`
+    : `/query/single/${key.metric_id}`;
+}
 
 export function Keys() {
   const keys = useResource(() => fetchKeys(), []);
@@ -23,7 +28,7 @@ export function Keys() {
     <div className="page keys">
       <h1>Metric Keys</h1>
       <table
-        style={{ width: "100%" }}
+        style={{ width: "100%", tableLayout: "fixed" }}
         className="bp3-html-table bp3-html-table-condensed bp3-html-table-striped"
       >
         <thead>
@@ -42,6 +47,13 @@ export function Keys() {
                 <NavLink to={genLink(key)} className="bp3-button bp3-minimal">
                   <Icon icon="chart" />
                   <span className="bp3-button-text">View Metric</span>
+                </NavLink>
+                <NavLink
+                  to={genQueryLink(key)}
+                  className="bp3-button bp3-minimal"
+                >
+                  <Icon icon="search" />
+                  <span className="bp3-button-text">Query Metric</span>
                 </NavLink>
               </td>
             </tr>

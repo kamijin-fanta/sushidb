@@ -6,8 +6,11 @@
     "@blueprintjs/core": "^3.9.0",
     "date-and-time": "^0.6.3",
     "http-proxy-middleware": "^0.19.1",
+    "monaco-editor": "^0.15.6",
+    "monaco-editor-webpack-plugin": "^1.7.0",
     "react": "^16.7.0-alpha.2",
     "react-dom": "^16.7.0-alpha.2",
+    "react-monaco-editor": "^0.22.0",
     "react-router": "^4.3.1",
     "react-router-dom": "^4.3.1",
     "react-scripts": "2.1.1"
@@ -31,6 +34,7 @@
     "eslint-config-react-app": "^3.0.5",
     "eslint-plugin-jest": "^22.1.2",
     "eslint-plugin-prettier": "^3.0.0",
-    "prettier": "^1.15.3"
+    "prettier": "^1.15.3",
+    "react-app-rewired": "^1.6.2"
   }
 }

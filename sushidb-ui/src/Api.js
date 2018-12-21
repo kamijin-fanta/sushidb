@@ -25,6 +25,20 @@ export function fetchMessageMetric(metricId, options = {}) {
   return fetch(`${API_BASE}/metric/message/${metricId}${queryString(options)}`);
 }
 
+export function queryMessage(metricId, data = {}, options = {}) {
+  return fetch(`${API_BASE}/query/message/${metricId}${queryString(options)}`, {
+    method: "POST",
+    body: data
+  });
+}
+
+export function querySingle(metricId, data = "", options = {}) {
+  return fetch(`${API_BASE}/query/single/${metricId}${queryString(options)}`, {
+    method: "POST",
+    body: data
+  });
+}
+
 /********** PD API **********/
 export function fetchPdList() {
   return fetch(`${API_BASE}/pd/`);

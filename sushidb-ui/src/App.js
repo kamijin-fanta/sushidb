@@ -10,6 +10,7 @@ import { Keys } from "./pages/Keys";
 import { SingleMetric } from "./pages/SingleMetric";
 import { MessageMetric } from "./pages/MessageMetric";
 import { StoreInfo } from "./pages/StoreInfo";
+import { QueryMetric } from "./pages/QueryMetric";
 
 class App extends Component {
   render() {
@@ -21,6 +22,7 @@ class App extends Component {
           <Route path="/keys" component={Keys} exact />
           <Route path="/metric/single/:key" component={SingleMetric} exact />
           <Route path="/metric/message/:key" component={MessageMetric} exact />
+          <Route path="/query/:type/:key" component={QueryMetric} exact />
           <Route path="/cluster/store" component={StoreInfo} exact />
         </div>
       </BrowserRouter>

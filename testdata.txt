@@ -17,3 +17,27 @@ curl localhost:3006/metric/message/hoge
 curl localhost:3006/metric/single/piyo?sort=desc
 
 curl -XPOST localhost:3006/query/message/hoge -d '{"filters": [{"type":"eq", "path": "$.app", "value": "hoge"}]}'
+
+```
+{
+  "filters": [
+    {
+      "type": "eq",
+      "path": "$.app",
+      "value": "hoge"
+    }
+  ]
+}
+```
+
+```
+{
+  "filters": [
+    {
+      "type": "eq",
+      "path": "$",
+      "value": 5.55
+    }
+  ]
+}
+```
