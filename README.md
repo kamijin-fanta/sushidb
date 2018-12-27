@@ -60,6 +60,48 @@ $ curl localhost:3000/metric/single/hoge
 }
 ```
 
+### POST /metric/{single|message}/:id
+
+advanced quering api
+
+sample request to `POST /metric/single/piyo`
+
+```json
+{
+  "filters": [
+    {
+      "type": "lte",
+      "path": "$",
+      "value": 3
+    }
+  ],
+  "limit": 1000,
+  "max_skip": 1000,
+  "cursor": 1544068003885000
+}
+```
+
+response
+
+```json
+{
+  "metric_id": "piyo",
+  "rows": [
+    {
+      "time": 1544068003882000,
+      "value": 2.22
+    },
+    {
+      "time": 1544068003881000,
+      "value": 1.11
+    }
+  ],
+  "query_time_ns": 33867300,
+  "cursor": 1544068003881000
+}
+```
+
+
 ### GET /keys/
 
 ## UI

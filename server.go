@@ -295,42 +295,57 @@ func ApiServer(r *gin.Engine, store *Store) {
 			return
 		}
 
-		changeBorder := false
-		lower := query.Query.Lower
-		upper := query.Query.Upper
-		if query.Query.Cursor != 0 {
-			if reverse && upper >= query.Query.Cursor { //desc
-				upper = query.Query.Cursor
-			} else if !reverse && lower <= query.Query.Cursor { // asc
-				lower = query.Query.Cursor
-				changeBorder = true // skip first row
-			}
-		}
-
-		switch metricType {
-		case MetricSingle:
-			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, query.Query.Limit, SubRawResolution, reverse, changeBorder)
-		case MetricMessage:
-			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, query.Query.Limit, SubRawResolution, reverse, changeBorder)
-		}
-		if fetchErr != nil {
-			errorResponse(c, "fetch error")
-			return
-		}
-
 		filteredRes := make([]SingleMetricResponseRow, 0)
 		var lastTimestamp int64 = 0
+		skipCount := 0
+		cursor := query.Query.Cursor
+		for len(filteredRes) < query.Query.Limit && skipCount < query.Query.MaxSkip {
+			changeBorder := false
+			lower := query.Query.Lower
+			upper := query.Query.Upper
+			if cursor != 0 {
+				if reverse && upper >= cursor { //desc
+					upper = cursor
+				} else if !reverse && lower <= cursor { // asc
+					lower = cursor
+					changeBorder = true // skip first row
+				}
+			}
+			limit := query.Query.Limit - len(filteredRes) + query.Query.MaxSkip/2
 
-		for _, row := range rows {
-			condition, err := query.FilterRow(row.Value)
-			if err != nil {
-				errorResponse(c, "query error"+err.Error())
+			switch metricType {
+			case MetricSingle:
+				rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, SubRawResolution, reverse, changeBorder)
+			case MetricMessage:
+				rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, SubRawResolution, reverse, changeBorder)
+			}
+			if fetchErr != nil {
+				errorResponse(c, "fetch error")
 				return
 			}
-			if condition {
-				filteredRes = append(filteredRes, row)
+
+			for _, row := range rows {
+				condition, err := query.FilterRow(row.Value)
+				if err != nil {
+					errorResponse(c, "query error"+err.Error())
+					return
+				}
+				if condition {
+					filteredRes = append(filteredRes, row)
+				} else {
+					skipCount += 1
+				}
+				lastTimestamp = row.Time
+
+				if len(filteredRes) >= query.Query.Limit || skipCount >= query.Query.MaxSkip {
+					break
+				}
 			}
-			lastTimestamp = row.Time
+			cursor = lastTimestamp
+
+			if len(rows) < limit { // If len does not reach limit, there is no next row
+				break
+			}
 		}
 
 		res := MetricResponse{
