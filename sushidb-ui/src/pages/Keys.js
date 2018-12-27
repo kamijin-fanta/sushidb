@@ -62,7 +62,6 @@ export function Keys() {
       </table>
       <div>
         <button onClick={keys.refresh}>refresh</button>
-        <pre>{JSON.stringify(keys.body, null, 2)}</pre>
       </div>
     </div>
   );
