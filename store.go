@@ -57,14 +57,14 @@ type SingleMetricResponseRow struct {
 	Value interface{} `json:"value"`
 }
 
-func (s *Store) FetchSingleMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool) ([]SingleMetricResponseRow, error) {
-	return s.FetchMetric(PrefixSingleValueMetric, metricId, lower, upper, limit, resolution, reverse)
+func (s *Store) FetchSingleMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
+	return s.FetchMetric(PrefixSingleValueMetric, metricId, lower, upper, limit, resolution, reverse, changeBorder)
 }
-func (s *Store) FetchMessageMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool) ([]SingleMetricResponseRow, error) {
-	return s.FetchMetric(PrefixMessageDataMetric, metricId, lower, upper, limit, resolution, reverse)
+func (s *Store) FetchMessageMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
+	return s.FetchMetric(PrefixMessageDataMetric, metricId, lower, upper, limit, resolution, reverse, changeBorder)
 }
 
-func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool) ([]SingleMetricResponseRow, error) {
+func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
 	var keys [][]byte
 	var values [][]byte
 	var err error
@@ -73,9 +73,15 @@ func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, up
 
 	if reverse {
 		startKey := EncodeKey(prefix, metricId, resolution, upper)
+		if changeBorder {
+			startKey = append(startKey, 0)
+		}
 		keys, values, err = s.rawKvClient.ReverseScan(startKey, limit)
 	} else {
 		startKey := EncodeKey(prefix, metricId, resolution, lower)
+		if changeBorder {
+			startKey = append(startKey, 0)
+		}
 		keys, values, err = s.rawKvClient.Scan(startKey, limit)
 	}
 	if err != nil {

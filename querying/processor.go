@@ -104,13 +104,13 @@ func EvaluationFilter(filters []FilterExpr, row interface{}, mustAll bool) (bool
 				}
 			}
 		case "and":
-			res, err := EvaluationFilter(*expr.ChildrenExpr, row, true)
+			res, err := EvaluationFilter(expr.ChildrenExpr, row, true)
 			if err != nil {
 				return false, nil
 			}
 			condition = condition || res
 		case "or":
-			res, err := EvaluationFilter(*expr.ChildrenExpr, row, false)
+			res, err := EvaluationFilter(expr.ChildrenExpr, row, false)
 			if err != nil {
 				return false, nil
 			}

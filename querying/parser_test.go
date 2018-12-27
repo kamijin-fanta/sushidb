@@ -51,7 +51,7 @@ func TestQueryParser(t *testing.T) {
 				Type:  "or",
 				Path:  "",
 				Value: nil,
-				ChildrenExpr: &[]FilterExpr{
+				ChildrenExpr: []FilterExpr{
 					{
 						Type:         "gte",
 						Path:         ".tmp",

@@ -111,7 +111,7 @@ func TestFilterRowOr(t *testing.T) {
 			Filters: []FilterExpr{
 				{
 					Type: "or",
-					ChildrenExpr: &[]FilterExpr{
+					ChildrenExpr: []FilterExpr{
 						{
 							Type:  "eq",
 							Path:  "$.id",

@@ -4,6 +4,7 @@ import { queryMessage, querySingle, useResource } from "../Api";
 import { dateFormat } from "../Formatter";
 import MonacoEditor from "react-monaco-editor";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { Button } from "@blueprintjs/core";
 
 const styles = {
   td: {
@@ -32,7 +33,9 @@ function editorDidMount(editor) {
             lower: { type: "integer" },
             upper: { type: "integer" },
             sort: { enum: ["asc", "desc"] },
-            limit: { type: "integer" }
+            limit: { type: "integer" },
+            max_skip: { type: "integer" },
+            cursor: { type: "integer" }
           }
         }
       },
@@ -169,8 +172,14 @@ export function QueryMetric(props) {
         onChange={(newValue, e) => setInputQuery(newValue)}
         editorDidMount={editorDidMount}
       />
-      <button onClick={onSubmit}>Search</button>
-      <button onClick={onFormats}>Format</button>
+      <div style={{ margin: "1rem 0" }}>
+        <Button onClick={onSubmit}>Search</Button>
+        <Button onClick={onFormats}>Format</Button>
+        <span>
+          Cursor: {metrics.body.cursor} / Query time:{" "}
+          {metrics.body.query_time_ns / 1000000}ms
+        </span>
+      </div>
 
       {metrics.isLoading ? (
         <>loading</>
@@ -192,7 +201,7 @@ export function QueryMetric(props) {
                 <tr key={row.time}>
                   <td style={styles.td}>{metricKey}</td>
                   <td style={styles.td}>
-                    {dateFormat(new Date(row.time / 1000))}
+                    {dateFormat(new Date(row.time / 1000))} ({row.time})
                   </td>
                   <td style={styles.td}>
                     {JSON.stringify(row.value, null, 2)}

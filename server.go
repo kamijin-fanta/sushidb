@@ -11,6 +11,7 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"time"
 )
 
 func errorResponse(c *gin.Context, message string) {
@@ -170,6 +171,8 @@ func ApiServer(r *gin.Engine, store *Store) {
 
 	/********** Query Metrics **********/
 	r.GET("/metric/:type/:id", func(c *gin.Context) {
+		c.Set("req", time.Now().UnixNano())
+
 		var err error
 		metricType, err := parseMetricType(c)
 		if err != nil {
@@ -230,11 +233,9 @@ func ApiServer(r *gin.Engine, store *Store) {
 
 		switch metricType {
 		case MetricSingle:
-			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, SubRawResolution, reverse)
-			break
+			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, SubRawResolution, reverse, false)
 		case MetricMessage:
-			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, SubRawResolution, reverse)
-			break
+			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, SubRawResolution, reverse, false)
 		}
 		if fetchErr != nil {
 			errorResponse(c, "fetch error")
@@ -242,13 +243,17 @@ func ApiServer(r *gin.Engine, store *Store) {
 		}
 
 		res := MetricResponse{
-			MetricId: string(targetId),
-			Rows:     rows,
+			MetricId:    string(targetId),
+			Rows:        rows,
+			QueryTimeNs: time.Now().UnixNano() - c.GetInt64("req"),
 		}
 		c.JSON(200, res)
 	})
 
+	/********** Advanced Query Metrics **********/
 	r.POST("/query/:type/:id", func(c *gin.Context) {
+		c.Set("req", time.Now().UnixNano())
+
 		metricType, err := parseMetricType(c)
 		if err != nil {
 			errorResponse(c, "bad metric type")
@@ -281,22 +286,32 @@ func ApiServer(r *gin.Engine, store *Store) {
 
 		reverse := true
 		switch query.Query.Sort {
-		case "desc":
-		case "":
+		case "desc", "":
 			reverse = true
-			break
+		case "asc":
+			reverse = false
 		default:
 			errorResponse(c, "invalid sort")
 			return
 		}
 
+		changeBorder := false
+		lower := query.Query.Lower
+		upper := query.Query.Upper
+		if query.Query.Cursor != 0 {
+			if reverse && upper >= query.Query.Cursor { //desc
+				upper = query.Query.Cursor
+			} else if !reverse && lower <= query.Query.Cursor { // asc
+				lower = query.Query.Cursor
+				changeBorder = true // skip first row
+			}
+		}
+
 		switch metricType {
 		case MetricSingle:
-			rows, fetchErr = store.FetchSingleMetric(targetId, query.Query.Lower, query.Query.Upper, query.Query.Limit, SubRawResolution, reverse)
-			break
+			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, query.Query.Limit, SubRawResolution, reverse, changeBorder)
 		case MetricMessage:
-			rows, fetchErr = store.FetchMessageMetric(targetId, query.Query.Lower, query.Query.Upper, query.Query.Limit, SubRawResolution, reverse)
-			break
+			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, query.Query.Limit, SubRawResolution, reverse, changeBorder)
 		}
 		if fetchErr != nil {
 			errorResponse(c, "fetch error")
@@ -304,6 +319,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 		}
 
 		filteredRes := make([]SingleMetricResponseRow, 0)
+		var lastTimestamp int64 = 0
 
 		for _, row := range rows {
 			condition, err := query.FilterRow(row.Value)
@@ -314,11 +330,14 @@ func ApiServer(r *gin.Engine, store *Store) {
 			if condition {
 				filteredRes = append(filteredRes, row)
 			}
+			lastTimestamp = row.Time
 		}
 
 		res := MetricResponse{
-			MetricId: string(targetId),
-			Rows:     filteredRes,
+			MetricId:    string(targetId),
+			Rows:        filteredRes,
+			QueryTimeNs: time.Now().UnixNano() - c.GetInt64("req"),
+			Cursor:      lastTimestamp,
 		}
 		c.JSON(200, res)
 	})
@@ -366,8 +385,10 @@ func ApiServer(r *gin.Engine, store *Store) {
 }
 
 type MetricResponse struct {
-	MetricId string                    `json:"metric_id"`
-	Rows     []SingleMetricResponseRow `json:"rows"`
+	MetricId    string                    `json:"metric_id"`
+	Rows        []SingleMetricResponseRow `json:"rows"`
+	QueryTimeNs int64                     `json:"query_time_ns"`
+	Cursor      int64                     `json:"cursor"`
 }
 
 const (
