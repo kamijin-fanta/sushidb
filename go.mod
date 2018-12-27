@@ -19,8 +19,6 @@ require (
 	github.com/vmihailenco/msgpack v4.0.0+incompatible
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
-	gopkg.in/stretchr/testify.v1 v1.2.2
-	k8s.io/client-go v10.0.0+incompatible
 )
 
 replace github.com/pkg/errors => github.com/pingcap/errors v0.9.0

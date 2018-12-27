@@ -9,7 +9,7 @@ type QueryAstRoot struct {
 	Lower   int64        `json:"lower"` // nanosecond
 	Upper   int64        `json:"upper"` // nanosecond
 	Sort    string       `json:"sort"`  // asc or desc
-	Limit   int          `json:"limit"` // asc or desc
+	Limit   int          `json:"limit"` // limit count
 	Filters []FilterExpr `json:"filters"`
 }
 type FilterExpr struct {

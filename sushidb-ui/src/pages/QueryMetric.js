@@ -57,7 +57,7 @@ function editorDidMount(editor) {
           type: "object",
           properties: {
             type: {
-              enum: ["eq"]
+              enum: ["eq", "gte", "gt", "lte", "lt"]
             },
             path: {
               type: "string"

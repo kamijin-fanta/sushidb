@@ -32,9 +32,13 @@ func EvaluationFilter(filters []FilterExpr, row interface{}, mustAll bool) (bool
 	}
 
 	for _, expr := range filters {
+		path := expr.Path
+		if len(path) == 0 {
+			path = "$"
+		}
 		switch expr.Type {
 		case "eq":
-			res, err := jsonpath.JsonPathLookup(row, expr.Path)
+			res, err := jsonpath.JsonPathLookup(row, path)
 			if err != nil {
 				return false, err
 			}
@@ -57,20 +61,60 @@ func EvaluationFilter(filters []FilterExpr, row interface{}, mustAll bool) (bool
 				break
 			}
 			break
+		case "gte", "gt", "lte", "lt":
+			res, err := jsonpath.JsonPathLookup(row, path)
+			if err != nil {
+				return false, err
+			}
+
+			filed := 0.0
+			r1 := true
+
+			switch v := res.(type) {
+			case float64:
+				filed = v
+			case int:
+				filed = float64(v)
+			default:
+				r1 = false
+			}
+
+			exprFloat := 0.0
+			r2 := true
+
+			switch exprValue := expr.Value.(type) {
+			case int:
+				exprFloat = float64(exprValue)
+			case float64:
+				exprFloat = exprValue
+			default:
+				r2 = false
+			}
+
+			if r1 && r2 {
+				switch expr.Type {
+				case "gte":
+					condition = condition || filed >= exprFloat || floatEquals(filed, exprFloat)
+				case "gt":
+					condition = condition || (filed > exprFloat && !floatEquals(filed, exprFloat))
+				case "lte":
+					condition = condition || filed <= exprFloat || floatEquals(filed, exprFloat)
+				case "lt":
+					condition = condition || (filed < exprFloat && !floatEquals(filed, exprFloat))
+				}
+			}
 		case "and":
 			res, err := EvaluationFilter(*expr.ChildrenExpr, row, true)
 			if err != nil {
 				return false, nil
 			}
 			condition = condition || res
-			break
 		case "or":
 			res, err := EvaluationFilter(*expr.ChildrenExpr, row, false)
 			if err != nil {
 				return false, nil
 			}
 			condition = condition || res
-			break
 		default:
 			return false, errors.New("undefined expression type '" + expr.Type + "'")
 		}
