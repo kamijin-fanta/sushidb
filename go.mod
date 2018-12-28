@@ -2,6 +2,7 @@ module github.com/kamijin-fanta/sushidb
 
 require (
 	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
+	github.com/bmizerany/perks v0.0.0-20141205001514-d9a9656a3a4b
 	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
 	github.com/gin-gonic/gin v1.3.0
