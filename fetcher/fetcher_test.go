@@ -3,6 +3,8 @@ package fetcher
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 type MockDefined struct {
@@ -34,8 +36,11 @@ func (r MockResourceImpl) fetch(key []byte, timestamp int64, asc bool) (rows []R
 			}
 			if !asc && def.TimeEnd > timestamp {
 				diff := timestamp - def.TimeStart
+				if timestamp == 0 {
+					diff = def.TimeEnd - def.TimeStart
+				}
 				offset = diff / def.TimeStep
-				if diff%def.TimeStep == 0 {
+				if timestamp != 0 && diff%def.TimeStep == 0 {
 					offset--
 				}
 			}
@@ -63,6 +68,33 @@ func PrintRows(rows []Row) {
 	for _, row := range rows {
 		fmt.Printf("Key: %v  Time: %d\n", string(row.MetricKey), row.TimeStamp)
 	}
+}
+
+func TestMockResource(t *testing.T) {
+	var mockResource Resource = MockResourceImpl{}
+	rows, err := mockResource.fetch([]byte("aaa"), 0, true)
+	assert.Nil(t, err)
+	assert.Equal(t, rows[0].TimeStamp, int64(1000))
+
+	rows, err = mockResource.fetch([]byte("aaa"), 1120, true)
+	assert.Nil(t, err)
+	assert.Equal(t, rows[0].TimeStamp, int64(1120))
+
+	rows, err = mockResource.fetch([]byte("aaa"), 1130, true)
+	assert.Nil(t, err)
+	assert.Equal(t, rows[0].TimeStamp, int64(1140))
+
+	rows, err = mockResource.fetch([]byte("aaa"), 0, false)
+	assert.Nil(t, err)
+	assert.Equal(t, rows[0].TimeStamp, int64(1500))
+
+	rows, err = mockResource.fetch([]byte("aaa"), 1380, false)
+	assert.Nil(t, err)
+	assert.Equal(t, rows[0].TimeStamp, int64(1360))
+
+	rows, err = mockResource.fetch([]byte("aaa"), 1370, false)
+	assert.Nil(t, err)
+	assert.Equal(t, rows[0].TimeStamp, int64(1360))
 }
 
 func ExampleFetchSingleAsc() {
@@ -151,8 +183,8 @@ func ExampleFetchMultiDesc() {
 
 	// Output:
 	// Key: ccc  Time: 1210
-	// Key: bbb  Time: 1200
 	// Key: aaa  Time: 1200
+	// Key: bbb  Time: 1200
 	// Key: ccc  Time: 1190
 	// Key: aaa  Time: 1180
 }
