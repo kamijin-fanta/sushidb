@@ -102,8 +102,8 @@ func ExampleFetchSingleAsc() {
 	requestKeys := [][]byte{
 		[]byte("aaa"),
 	}
-	fetcher := NewFetcher(requestKeys, 1180, mockResource)
-	rows, _ := fetcher.FetchRecursive(5, 0, true)
+	fetcher := NewFetcher(requestKeys, 1180, 0, true, mockResource)
+	rows, _ := fetcher.Next(5)
 	PrintRows(rows)
 
 	// Output:
@@ -121,8 +121,8 @@ func ExampleFetchMultiAsc() {
 		[]byte("bbb"),
 		[]byte("ccc"),
 	}
-	fetcher := NewFetcher(requestKeys, 1180, mockResource)
-	rows, _ := fetcher.FetchRecursive(5, 0, true)
+	fetcher := NewFetcher(requestKeys, 1180, 0, true, mockResource)
+	rows, _ := fetcher.Next(5)
 	PrintRows(rows)
 
 	// Output:
@@ -140,8 +140,8 @@ func ExampleFetchAscLimited() {
 		[]byte("bbb"),
 		[]byte("ccc"),
 	}
-	fetcher := NewFetcher(requestKeys, 1190, mockResource)
-	rows, _ := fetcher.FetchRecursive(100, 1230, true)
+	fetcher := NewFetcher(requestKeys, 1190, 1230, true, mockResource)
+	rows, _ := fetcher.Next(100)
 	PrintRows(rows)
 
 	// Output:
@@ -158,8 +158,8 @@ func ExampleFetchSingleDesc() {
 	requestKeys := [][]byte{
 		[]byte("aaa"),
 	}
-	fetcher := NewFetcher(requestKeys, 1270, mockResource)
-	rows, _ := fetcher.FetchRecursive(5, 0, false)
+	fetcher := NewFetcher(requestKeys, 1270, 0, false, mockResource)
+	rows, _ := fetcher.Next(5)
 	PrintRows(rows)
 
 	// Output:
@@ -177,9 +177,14 @@ func ExampleFetchMultiDesc() {
 		[]byte("aaa"),
 		[]byte("bbb"),
 	}
-	fetcher := NewFetcher(requestKeys, 1220, mockResource)
-	rows, _ := fetcher.FetchRecursive(5, 0, false)
+	fetcher := NewFetcher(requestKeys, 1220, 1140, false, mockResource)
+	rows, _ := fetcher.Next(5)
 	PrintRows(rows)
+	fmt.Println(fetcher.MaybeHasNext)
+
+	rows, _ = fetcher.Next(5)
+	PrintRows(rows)
+	fmt.Println(fetcher.MaybeHasNext)
 
 	// Output:
 	// Key: ccc  Time: 1210
@@ -187,4 +192,10 @@ func ExampleFetchMultiDesc() {
 	// Key: bbb  Time: 1200
 	// Key: ccc  Time: 1190
 	// Key: aaa  Time: 1180
+	// true
+	// Key: ccc  Time: 1170
+	// Key: aaa  Time: 1160
+	// Key: ccc  Time: 1150
+	// Key: aaa  Time: 1140
+	// false
 }
