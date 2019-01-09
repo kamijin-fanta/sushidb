@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"github.com/bmizerany/perks/quantile"
@@ -33,7 +34,7 @@ type BenchmarkInput struct {
 func main() {
 	conf := Config{
 		Threads:            32,
-		MaxCount:           100000,          // 0: infinity
+		MaxCount:           10000,           // 0: infinity
 		Duration:           0 * time.Second, // 0: infinity
 		DataChannelBuffer:  100,
 		RandomSourceLength: 10000,
@@ -160,13 +161,18 @@ func WriteBenchmark(data chan BenchmarkInput, stats chan Status, done chan struc
 	// client init
 	pdAddress := os.Getenv("PD_ADDRESS")
 	ope := os.Getenv("OPERATION")
+	driverType := os.Getenv("DRIVER")
 
 	addressList := strings.Split(pdAddress, ",")
 	rawClient, err := tikv.NewRawKVClient(addressList, config.Security{})
 	if err != nil {
 		panic(err)
 	}
+	driver := tikv.Driver{}
+	txClient, err := driver.Open("tikv://" + pdAddress)
+
 	defer rawClient.Close()
+	defer txClient.Close()
 
 	// main loop
 	for row := range data {
@@ -185,13 +191,30 @@ func WriteBenchmark(data chan BenchmarkInput, stats chan Status, done chan struc
 		key = append(key, buf...)
 
 		var err error
-		switch ope {
-		default: // put
-			err = rawClient.Put(key, row.Value)
-		case "get":
-			_, err = rawClient.Get(key)
-		case "del":
-			err = rawClient.Delete(key)
+		switch driverType {
+		default: // raw
+			switch ope {
+			default: // put
+				err = rawClient.Put(key, row.Value)
+			case "get":
+				_, err = rawClient.Get(key)
+			case "del":
+				err = rawClient.Delete(key)
+			}
+		case "tx":
+			switch ope {
+			default: // put
+				tx, _ := txClient.Begin()
+				tx.Set(key, row.Value)
+				err = tx.Commit(context.Background())
+			case "get":
+				tx, _ := txClient.Begin()
+				_, err = tx.Get(key)
+			case "del":
+				tx, _ := txClient.Begin()
+				tx.Delete(key)
+				err = tx.Commit(context.Background())
+			}
 		}
 
 		errorCount := 0
