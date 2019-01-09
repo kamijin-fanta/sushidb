@@ -198,8 +198,8 @@ export function QueryMetric(props) {
           <tbody>
             {metrics.body.rows &&
               metrics.body.rows.map(row => (
-                <tr key={row.time}>
-                  <td style={styles.td}>{metricKey}</td>
+                <tr key={row.metric_key + row.time}>
+                  <td style={styles.td}>{row.metric_key}</td>
                   <td style={styles.td}>
                     {dateFormat(new Date(row.time / 1000))} ({row.time})
                   </td>

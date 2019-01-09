@@ -4,7 +4,7 @@ type Row struct {
 	MetricKey []byte
 	TimeStamp int64
 	Key       []byte
-	Value     []byte
+	Value     interface{}
 }
 
 type FetchItem struct {
@@ -17,7 +17,7 @@ type FetchItem struct {
 }
 
 type Resource interface {
-	fetch(key []byte, timestamp int64, asc bool) (rows []Row, error error)
+	Fetch(key []byte, timestamp int64, asc bool) (rows []Row, error error)
 }
 
 type Fetcher struct {
@@ -55,9 +55,9 @@ func (f *Fetcher) Next(limit int) (rows []Row, error error) {
 
 		for idx := range f.Items {
 			item := &f.Items[idx]
-			// fetch next items
+			// Fetch next items
 			if item.Stop == false && len(item.Rows) <= item.ReadPointIndex {
-				rows, err := f.Resource.fetch(item.MetricKey, item.ReadPointTimeStamp, f.Asc)
+				rows, err := f.Resource.Fetch(item.MetricKey, item.ReadPointTimeStamp, f.Asc)
 				if err != nil {
 					return nil, err
 				}

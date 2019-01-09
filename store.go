@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	"github.com/kamijin-fanta/sushidb/fetcher"
 	"github.com/pingcap/pd/client"
 	"github.com/pingcap/tidb/store/tikv"
 	"github.com/vmihailenco/msgpack"
@@ -53,8 +53,9 @@ func (s *Store) FetchKeys(start []byte, limit int) ([]KeyResponseRow, error) {
 }
 
 type SingleMetricResponseRow struct {
-	Time  int64       `json:"time"`
-	Value interface{} `json:"value"`
+	Time      int64       `json:"time"`
+	Value     interface{} `json:"value"`
+	MetricKey string      `json:"metric_key"`
 }
 
 func (s *Store) FetchSingleMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
@@ -141,13 +142,41 @@ func (s *Store) PutMetric(prefix PrefixTypes, metricId []byte, time int64, resol
 	}
 
 	// write keys info
-	keysInfoMetricKey := EncodeKey(prefix, []byte(metricId), subType, 0)
+	keysInfoMetricKey := EncodeKey(PrefixKeysMetric, []byte(metricId), subType, 0)
 	writeKeyInfoError := s.rawKvClient.Put(keysInfoMetricKey, []byte{0})
 	if writeKeyInfoError != nil {
 		return writeKeyInfoError
 	}
 
 	return nil
+}
+
+type StoreResourceImpl struct {
+	PrefixTypes  PrefixTypes
+	Store        *Store
+	Limit        int
+	ChangeBorder bool
+}
+
+func (r *StoreResourceImpl) Fetch(key []byte, timestamp int64, asc bool) ([]fetcher.Row, error) {
+	var resRows []SingleMetricResponseRow
+	var err error
+	if asc {
+		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, timestamp, 0, r.Limit, SubRawResolution, false, r.ChangeBorder)
+	} else {
+		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, 0, timestamp, r.Limit, SubRawResolution, true, r.ChangeBorder)
+	}
+	var rows []fetcher.Row
+	for i := range resRows {
+		row := resRows[i]
+		rows = append(rows, fetcher.Row{
+			Value:     row.Value,
+			TimeStamp: row.Time,
+			Key:       key,
+			MetricKey: key,
+		})
+	}
+	return rows, err
 }
 
 type client interface {
@@ -159,7 +188,6 @@ func (s *Store) PdRequest(path string) ([]byte, error) {
 	maxInitClusterRetries := 10
 	for i := 0; i < maxInitClusterRetries; i++ {
 		for _, url := range urls {
-			fmt.Println(url + path)
 			res, err := http.Get(url + path)
 			if err != nil {
 				return nil, err

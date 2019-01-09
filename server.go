@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/kamijin-fanta/sushidb/fetcher"
 	"github.com/kamijin-fanta/sushidb/querying"
 	"io"
 	"log"
@@ -150,7 +151,6 @@ func ApiServer(r *gin.Engine, store *Store) {
 				errorResponse(c, "invalid body. You can post a numerical value.")
 			}
 			writeError = store.PutSingleMetric(metricIdBytes, metricTime, SubRawResolution, floatValue)
-
 			break
 		case MetricMessage:
 			writeError = store.PutMessageMetric(metricIdBytes, metricTime, SubRawResolution, receiveJson)
@@ -267,9 +267,6 @@ func ApiServer(r *gin.Engine, store *Store) {
 		}
 		targetId := []byte(targetIdStr)
 
-		var rows []SingleMetricResponseRow
-		var fetchErr error
-
 		buf := new(bytes.Buffer)
 		_, err = io.Copy(buf, c.Request.Body)
 		if err != nil {
@@ -295,6 +292,34 @@ func ApiServer(r *gin.Engine, store *Store) {
 			return
 		}
 
+		var prefixTypes PrefixTypes
+		switch metricType {
+		case MetricSingle:
+			prefixTypes = PrefixSingleValueMetric
+		case MetricMessage:
+			prefixTypes = PrefixMessageDataMetric
+		}
+
+		resource := StoreResourceImpl{
+			Store:       store,
+			Limit:       100, // todo batch size
+			PrefixTypes: prefixTypes,
+		}
+		var storeFetcher fetcher.Fetcher
+		var keys [][]byte
+		// keys = append(keys, targetId) // todo multi
+		for i := range query.Query.MetricIDs {
+			keys = append(keys, []byte(query.Query.MetricIDs[i]))
+		}
+		switch query.Query.Sort {
+		default: // desc
+			storeFetcher = fetcher.NewFetcher(keys, query.Query.Upper, query.Query.Lower, false, &resource)
+		case "asc":
+			storeFetcher = fetcher.NewFetcher(keys, query.Query.Upper, query.Query.Lower, true, &resource)
+		}
+
+		var rows []fetcher.Row
+		var fetchErr error
 		filteredRes := make([]SingleMetricResponseRow, 0)
 		var lastTimestamp int64 = 0
 		skipCount := 0
@@ -313,12 +338,8 @@ func ApiServer(r *gin.Engine, store *Store) {
 			}
 			limit := query.Query.Limit - len(filteredRes) + query.Query.MaxSkip/2
 
-			switch metricType {
-			case MetricSingle:
-				rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, SubRawResolution, reverse, changeBorder)
-			case MetricMessage:
-				rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, SubRawResolution, reverse, changeBorder)
-			}
+			resource.ChangeBorder = changeBorder // todo
+			rows, fetchErr = storeFetcher.Next(100)
 			if fetchErr != nil {
 				errorResponse(c, "fetch error")
 				return
@@ -331,11 +352,15 @@ func ApiServer(r *gin.Engine, store *Store) {
 					return
 				}
 				if condition {
-					filteredRes = append(filteredRes, row)
+					filteredRes = append(filteredRes, SingleMetricResponseRow{
+						Value:     row.Value,
+						Time:      row.TimeStamp,
+						MetricKey: string(row.MetricKey),
+					})
 				} else {
 					skipCount += 1
 				}
-				lastTimestamp = row.Time
+				lastTimestamp = row.TimeStamp
 
 				if len(filteredRes) >= query.Query.Limit || skipCount >= query.Query.MaxSkip {
 					break

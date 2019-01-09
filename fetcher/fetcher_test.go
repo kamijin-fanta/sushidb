@@ -72,27 +72,27 @@ func PrintRows(rows []Row) {
 
 func TestMockResource(t *testing.T) {
 	var mockResource Resource = MockResourceImpl{}
-	rows, err := mockResource.fetch([]byte("aaa"), 0, true)
+	rows, err := mockResource.Fetch([]byte("aaa"), 0, true)
 	assert.Nil(t, err)
 	assert.Equal(t, rows[0].TimeStamp, int64(1000))
 
-	rows, err = mockResource.fetch([]byte("aaa"), 1120, true)
+	rows, err = mockResource.Fetch([]byte("aaa"), 1120, true)
 	assert.Nil(t, err)
 	assert.Equal(t, rows[0].TimeStamp, int64(1120))
 
-	rows, err = mockResource.fetch([]byte("aaa"), 1130, true)
+	rows, err = mockResource.Fetch([]byte("aaa"), 1130, true)
 	assert.Nil(t, err)
 	assert.Equal(t, rows[0].TimeStamp, int64(1140))
 
-	rows, err = mockResource.fetch([]byte("aaa"), 0, false)
+	rows, err = mockResource.Fetch([]byte("aaa"), 0, false)
 	assert.Nil(t, err)
 	assert.Equal(t, rows[0].TimeStamp, int64(1500))
 
-	rows, err = mockResource.fetch([]byte("aaa"), 1380, false)
+	rows, err = mockResource.Fetch([]byte("aaa"), 1380, false)
 	assert.Nil(t, err)
 	assert.Equal(t, rows[0].TimeStamp, int64(1360))
 
-	rows, err = mockResource.fetch([]byte("aaa"), 1370, false)
+	rows, err = mockResource.Fetch([]byte("aaa"), 1370, false)
 	assert.Nil(t, err)
 	assert.Equal(t, rows[0].TimeStamp, int64(1360))
 }

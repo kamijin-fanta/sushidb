@@ -10,6 +10,12 @@ curl -XPOST localhost:3006/metric/single/piyo/1544068003883000 -d '3.33'
 curl -XPOST localhost:3006/metric/single/piyo/1544068003882000 -d '2.22'
 curl -XPOST localhost:3006/metric/single/piyo/1544068003881000 -d '1.11'
 
+curl -XPOST localhost:3006/metric/single/fuga/1544068003887000 -d '7.77'
+curl -XPOST localhost:3006/metric/single/fuga/1544068003886000 -d '6.66'
+curl -XPOST localhost:3006/metric/single/fuga/1544068003885000 -d '5.55'
+curl -XPOST localhost:3006/metric/single/fuga/1544068003884000 -d '4.44'
+curl -XPOST localhost:3006/metric/single/fuga/1544068003883000 -d '3.33'
+
 
 
 curl localhost:3006/metric/message/hoge
