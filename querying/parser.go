@@ -6,14 +6,14 @@ import (
 )
 
 type QueryAstRoot struct {
-	Lower     int64        `json:"lower"`    // nanosecond
-	Upper     int64        `json:"upper"`    // nanosecond
-	Sort      string       `json:"sort"`     // asc or desc
-	Limit     int          `json:"limit"`    // limit count
-	MaxSkip   int          `json:"max_skip"` // limit of skip count
-	Cursor    int64        `json:"cursor"`   // cursor bound
-	Filters   []FilterExpr `json:"filters"`
-	MetricIDs []string     `json:"metric_ids"`
+	Lower      int64        `json:"lower"`    // nanosecond
+	Upper      int64        `json:"upper"`    // nanosecond
+	Sort       string       `json:"sort"`     // asc or desc
+	Limit      int          `json:"limit"`    // limit count
+	MaxSkip    int          `json:"max_skip"` // limit of skip count
+	Cursor     int64        `json:"cursor"`   // cursor bound
+	Filters    []FilterExpr `json:"filters"`
+	MetricKeys []string     `json:"metric_keys"`
 }
 type FilterExpr struct {
 	Type         string       `json:"type"`

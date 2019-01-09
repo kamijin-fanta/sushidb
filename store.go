@@ -58,14 +58,14 @@ type SingleMetricResponseRow struct {
 	MetricKey string      `json:"metric_key"`
 }
 
-func (s *Store) FetchSingleMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
-	return s.FetchMetric(PrefixSingleValueMetric, metricId, lower, upper, limit, resolution, reverse, changeBorder)
+func (s *Store) FetchSingleMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
+	return s.FetchMetric(PrefixSingleValueMetric, metricId, lower, upper, limit, resolution, reverse, includeUpperBorder)
 }
-func (s *Store) FetchMessageMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
-	return s.FetchMetric(PrefixMessageDataMetric, metricId, lower, upper, limit, resolution, reverse, changeBorder)
+func (s *Store) FetchMessageMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
+	return s.FetchMetric(PrefixMessageDataMetric, metricId, lower, upper, limit, resolution, reverse, includeUpperBorder)
 }
 
-func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, changeBorder bool) ([]SingleMetricResponseRow, error) {
+func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
 	var keys [][]byte
 	var values [][]byte
 	var err error
@@ -74,15 +74,12 @@ func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, up
 
 	if reverse {
 		startKey := EncodeKey(prefix, metricId, resolution, upper)
-		if changeBorder {
+		if includeUpperBorder {
 			startKey = append(startKey, 0)
 		}
 		keys, values, err = s.rawKvClient.ReverseScan(startKey, limit)
 	} else {
 		startKey := EncodeKey(prefix, metricId, resolution, lower)
-		if changeBorder {
-			startKey = append(startKey, 0)
-		}
 		keys, values, err = s.rawKvClient.Scan(startKey, limit)
 	}
 	if err != nil {
@@ -94,7 +91,8 @@ func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, up
 		if metricType != prefix || !bytes.Equal(respondMetricId, metricId) || resolution != respondResolution {
 			break
 		}
-		if (!reverse && time > upper) || (reverse && time < lower) { // out of range
+		if (!reverse && (!includeUpperBorder && (time >= upper) || includeUpperBorder && (time > upper))) ||
+			(reverse && time < lower) { // out of range
 			break
 		}
 
@@ -152,19 +150,19 @@ func (s *Store) PutMetric(prefix PrefixTypes, metricId []byte, time int64, resol
 }
 
 type StoreResourceImpl struct {
-	PrefixTypes  PrefixTypes
-	Store        *Store
-	Limit        int
-	ChangeBorder bool
+	PrefixTypes       PrefixTypes
+	Store             *Store
+	Limit             int
+	IncludeLastBorder bool
 }
 
 func (r *StoreResourceImpl) Fetch(key []byte, timestamp int64, asc bool) ([]fetcher.Row, error) {
 	var resRows []SingleMetricResponseRow
 	var err error
 	if asc {
-		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, timestamp, 0, r.Limit, SubRawResolution, false, r.ChangeBorder)
+		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, timestamp, 0, r.Limit, SubRawResolution, false, r.IncludeLastBorder)
 	} else {
-		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, 0, timestamp, r.Limit, SubRawResolution, true, r.ChangeBorder)
+		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, 0, timestamp, r.Limit, SubRawResolution, true, r.IncludeLastBorder)
 	}
 	var rows []fetcher.Row
 	for i := range resRows {

@@ -308,8 +308,8 @@ func ApiServer(r *gin.Engine, store *Store) {
 		var storeFetcher fetcher.Fetcher
 		var keys [][]byte
 		// keys = append(keys, targetId) // todo multi
-		for i := range query.Query.MetricIDs {
-			keys = append(keys, []byte(query.Query.MetricIDs[i]))
+		for i := range query.Query.MetricKeys {
+			keys = append(keys, []byte(query.Query.MetricKeys[i]))
 		}
 		switch query.Query.Sort {
 		default: // desc
@@ -325,7 +325,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 		skipCount := 0
 		cursor := query.Query.Cursor
 		for len(filteredRes) < query.Query.Limit && skipCount < query.Query.MaxSkip {
-			changeBorder := false
+			includeLastBorder := false
 			lower := query.Query.Lower
 			upper := query.Query.Upper
 			if cursor != 0 {
@@ -333,12 +333,12 @@ func ApiServer(r *gin.Engine, store *Store) {
 					upper = cursor
 				} else if !reverse && lower <= cursor { // asc
 					lower = cursor
-					changeBorder = true // skip first row
+					includeLastBorder = true // skip first row
 				}
 			}
 			limit := query.Query.Limit - len(filteredRes) + query.Query.MaxSkip/2
 
-			resource.ChangeBorder = changeBorder // todo
+			resource.IncludeLastBorder = includeLastBorder // todo
 			rows, fetchErr = storeFetcher.Next(100)
 			if fetchErr != nil {
 				errorResponse(c, "fetch error")
