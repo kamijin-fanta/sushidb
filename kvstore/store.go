@@ -1,4 +1,4 @@
-package main
+package kvstore
 
 import (
 	"bytes"
@@ -16,9 +16,17 @@ type Store struct {
 	pbClient    pd.Client
 }
 
+func New(kvClient tikv.RawKVClient, pdClient pd.Client) Store {
+	return Store{kvClient, pdClient}
+}
+
 type KeyResponseRow struct {
 	MetricId string `json:"metric_id"`
 	Type     string `json:"type"`
+}
+
+func (s *Store) ClusterID() uint64 {
+	return s.rawKvClient.ClusterID()
 }
 
 func (s *Store) FetchKeys(start []byte, limit int) ([]KeyResponseRow, error) {
@@ -156,7 +164,7 @@ type StoreResourceImpl struct {
 	IncludeLastBorder bool
 }
 
-func (r *StoreResourceImpl) Fetch(key []byte, timestamp int64, asc bool) ([]fetcher.Row, error) {
+func (r *StoreResourceImpl) Fetch(key []byte, timestamp int64, asc bool) ([]fetcher.Row, bool, error) {
 	var resRows []SingleMetricResponseRow
 	var err error
 	if asc {
@@ -174,7 +182,7 @@ func (r *StoreResourceImpl) Fetch(key []byte, timestamp int64, asc bool) ([]fetc
 			MetricKey: key,
 		})
 	}
-	return rows, err
+	return rows, r.Limit > len(rows), err
 }
 
 type client interface {

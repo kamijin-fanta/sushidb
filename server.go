@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/kamijin-fanta/sushidb/fetcher"
+	"github.com/kamijin-fanta/sushidb/kvstore"
 	"github.com/kamijin-fanta/sushidb/querying"
 	"io"
 	"log"
@@ -21,81 +21,7 @@ func errorResponse(c *gin.Context, message string) {
 	})
 }
 
-// Metric subtypes
-const (
-	SubRawResolution int8 = iota
-	SubCompressResolution
-	SubOneMinutesResolution
-	SubOneHourResolution
-	SubOneDayResolution
-)
-
-// Keys subtype
-const (
-	SubSingleKeys int8 = iota
-	SubMessageKeys
-)
-
-// Prefix Types
-type PrefixTypes int
-
-const (
-	PrefixSingleValueMetric PrefixTypes = iota
-	PrefixMessageDataMetric
-	PrefixKeysMetric
-	PrefixKnown = 1000000000
-)
-
-func EncodeKey(metricType PrefixTypes, metricId []byte, subtype int8, time int64) (result []byte) {
-	sep := []byte("_")
-	timeBuffer := make([]byte, 8)
-	binary.BigEndian.PutUint64(timeBuffer, uint64(time))
-
-	var prefix []byte
-	switch metricType {
-	case PrefixSingleValueMetric:
-		prefix = []byte("s1")
-	case PrefixMessageDataMetric:
-		prefix = []byte("m1")
-	case PrefixKeysMetric:
-		prefix = []byte("k1")
-	default:
-		panic("undefined metric Type")
-	}
-
-	// [prefix]_[metricId]_[subtype]_[time ns]
-	result = append(result, prefix[:]...)          // 2 bytes
-	result = append(result, sep...)                // 1 byte
-	result = append(result, metricId...)           // n bytes
-	result = append(result, sep...)                // 1 byte
-	result = append(result, byte(subtype))         // 1 byte
-	result = append(result, sep...)                // 1 byte
-	result = append(result, []byte(timeBuffer)...) // 8 bytes
-	log.Printf("encode key: %+v, %s", result, string(result))
-	return
-}
-func DecodeKey(key []byte) (metricType PrefixTypes, metricId []byte, subtype int8, time int64) {
-	length := len(key)
-	prefix := key[:2]
-	switch string(prefix) {
-	case "s1":
-		metricType = PrefixSingleValueMetric
-	case "m1":
-		metricType = PrefixMessageDataMetric
-	case "k1":
-		metricType = PrefixKeysMetric
-	default:
-		return PrefixKnown, metricId, subtype, time
-	}
-	timeLength := 8
-	timeBuffer := key[length-timeLength:]
-	time = int64(binary.BigEndian.Uint64(timeBuffer))
-	subtype = int8(key[length-timeLength-2])
-	metricId = key[3 : length-timeLength-3]
-	return
-}
-
-func ApiServer(r *gin.Engine, store *Store) {
+func ApiServer(r *gin.Engine, store *kvstore.Store) {
 	/********** PING **********/
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -106,7 +32,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 	/********** Cluster Info **********/
 	r.GET("/cluster", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"cluster": store.rawKvClient.ClusterID(),
+			"cluster": store.ClusterID(),
 		})
 	})
 
@@ -151,10 +77,10 @@ func ApiServer(r *gin.Engine, store *Store) {
 			if !success {
 				errorResponse(c, "invalid body. You can post a numerical value.")
 			}
-			writeError = store.PutSingleMetric(metricIdBytes, metricTime, SubRawResolution, floatValue)
+			writeError = store.PutSingleMetric(metricIdBytes, metricTime, kvstore.SubRawResolution, floatValue)
 			break
 		case MetricMessage:
-			writeError = store.PutMessageMetric(metricIdBytes, metricTime, SubRawResolution, receiveJson)
+			writeError = store.PutMessageMetric(metricIdBytes, metricTime, kvstore.SubRawResolution, receiveJson)
 			break
 		}
 
@@ -229,14 +155,14 @@ func ApiServer(r *gin.Engine, store *Store) {
 			return
 		}
 
-		var rows []SingleMetricResponseRow
+		var rows []kvstore.SingleMetricResponseRow
 		var fetchErr error
 
 		switch metricType {
 		case MetricSingle:
-			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, SubRawResolution, reverse, false)
+			rows, fetchErr = store.FetchSingleMetric(targetId, lower, upper, limit, kvstore.SubRawResolution, reverse, false)
 		case MetricMessage:
-			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, SubRawResolution, reverse, false)
+			rows, fetchErr = store.FetchMessageMetric(targetId, lower, upper, limit, kvstore.SubRawResolution, reverse, false)
 		}
 		if fetchErr != nil {
 			errorResponse(c, "fetch error")
@@ -293,15 +219,21 @@ func ApiServer(r *gin.Engine, store *Store) {
 			return
 		}
 
-		var prefixTypes PrefixTypes
+		var prefixTypes kvstore.PrefixTypes
 		switch metricType {
 		case MetricSingle:
-			prefixTypes = PrefixSingleValueMetric
+			prefixTypes = kvstore.PrefixSingleValueMetric
 		case MetricMessage:
-			prefixTypes = PrefixMessageDataMetric
+			prefixTypes = kvstore.PrefixMessageDataMetric
 		}
 
-		resource := StoreResourceImpl{
+		cursorTimestamp, _, cursorErr := query.Query.ParseCursor()
+		if cursorErr != nil {
+			errorResponse(c, "cannot parse cursor")
+			return
+		}
+
+		resource := kvstore.StoreResourceImpl{
 			Store:       store,
 			Limit:       100, // todo batch size
 			PrefixTypes: prefixTypes,
@@ -321,19 +253,24 @@ func ApiServer(r *gin.Engine, store *Store) {
 
 		var rows []fetcher.Row
 		var fetchErr error
-		filteredRes := make([]SingleMetricResponseRow, 0)
+		filteredRes := make([]kvstore.SingleMetricResponseRow, 0)
 		var lastTimestamp int64 = 0
 		skipCount := 0
-		cursor := query.Query.Cursor
+
+		fetchErr = storeFetcher.PreFetch()
+		if fetchErr != nil {
+			errorResponse(c, "fetch error")
+			return
+		}
 		for len(filteredRes) < query.Query.Limit && skipCount < query.Query.MaxSkip {
 			includeLastBorder := false
 			lower := query.Query.Lower
 			upper := query.Query.Upper
-			if cursor != 0 {
-				if reverse && upper >= cursor { //desc
-					upper = cursor
-				} else if !reverse && lower <= cursor { // asc
-					lower = cursor
+			if cursorTimestamp != 0 {
+				if reverse && upper >= cursorTimestamp { //desc
+					upper = cursorTimestamp
+				} else if !reverse && lower <= cursorTimestamp { // asc
+					lower = cursorTimestamp
 					includeLastBorder = true // skip first row
 				}
 			}
@@ -353,7 +290,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 					return
 				}
 				if condition {
-					filteredRes = append(filteredRes, SingleMetricResponseRow{
+					filteredRes = append(filteredRes, kvstore.SingleMetricResponseRow{
 						Value:     row.Value,
 						Time:      row.TimeStamp,
 						MetricKey: string(row.MetricKey),
@@ -367,7 +304,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 					break
 				}
 			}
-			cursor = lastTimestamp
+			cursorTimestamp = lastTimestamp
 
 			if len(rows) < limit { // If len does not reach limit, there is no next row
 				break
@@ -378,7 +315,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 			MetricId:    string(targetId),
 			Rows:        filteredRes,
 			QueryTimeNs: time.Now().UnixNano() - c.GetInt64("req"),
-			Cursor:      lastTimestamp,
+			Cursor:      strconv.FormatInt(lastTimestamp, 10) + "," + strconv.Itoa(0),
 		}
 		c.JSON(200, res)
 	})
@@ -426,10 +363,10 @@ func ApiServer(r *gin.Engine, store *Store) {
 }
 
 type MetricResponse struct {
-	MetricId    string                    `json:"metric_id"`
-	Rows        []SingleMetricResponseRow `json:"rows"`
-	QueryTimeNs int64                     `json:"query_time_ns"`
-	Cursor      int64                     `json:"cursor"`
+	MetricId    string                            `json:"metric_id"`
+	Rows        []kvstore.SingleMetricResponseRow `json:"rows"`
+	QueryTimeNs int64                             `json:"query_time_ns"`
+	Cursor      string                            `json:"cursor"`
 }
 
 const (

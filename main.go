@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/kamijin-fanta/sushidb/kvstore"
 	"github.com/pingcap/pd/client"
 	"log"
 	"os"
@@ -34,10 +35,7 @@ func main() {
 	}
 	defer pdClient.Close()
 
-	store := Store{
-		rawKvClient: *rawClient,
-		pbClient:    pdClient,
-	}
+	store := kvstore.New(*rawClient, pdClient)
 
 	fmt.Printf("cluster ID: %d\n", rawClient.ClusterID())
 

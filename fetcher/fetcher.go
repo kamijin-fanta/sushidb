@@ -48,6 +48,23 @@ func NewFetcher(metricKeys [][]byte, startTimeStamp int64, limitTimestamp int64,
 	}
 }
 
+func (f *Fetcher) PreFetch() error {
+	for idx := range f.Items {
+		item := &f.Items[idx]
+		if item.Stop == false && len(item.Rows) <= item.ReadPointIndex {
+			rows, stop, err := f.Resource.Fetch(item.MetricKey, item.ReadPointTimeStamp, f.Asc)
+			if err != nil {
+				return err
+			}
+			item.Rows = append(item.Rows, rows...)
+			if len(item.Rows) == 0 || stop {
+				item.Stop = true
+			}
+		}
+	}
+	return nil
+}
+
 func (f *Fetcher) Next(limit int) (rows []Row, error error) {
 	size := 0
 	for limit > size {
