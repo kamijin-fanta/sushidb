@@ -35,7 +35,7 @@ function editorDidMount(editor) {
             sort: { enum: ["asc", "desc"] },
             limit: { type: "integer" },
             max_skip: { type: "integer" },
-            cursor: { type: "integer" },
+            cursor: { type: "string" },
             metric_keys: {
               type: "array",
               items: {

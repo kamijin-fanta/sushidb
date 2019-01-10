@@ -162,15 +162,16 @@ type StoreResourceImpl struct {
 	Store             *Store
 	Limit             int
 	IncludeLastBorder bool
+	LimitTS           int64
 }
 
 func (r *StoreResourceImpl) Fetch(key []byte, timestamp int64, asc bool) ([]fetcher.Row, bool, error) {
 	var resRows []SingleMetricResponseRow
 	var err error
 	if asc {
-		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, timestamp, 0, r.Limit, SubRawResolution, false, r.IncludeLastBorder)
+		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, timestamp, r.LimitTS, r.Limit, SubRawResolution, false, r.IncludeLastBorder)
 	} else {
-		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, 0, timestamp, r.Limit, SubRawResolution, true, r.IncludeLastBorder)
+		resRows, err = r.Store.FetchMetric(r.PrefixTypes, key, r.LimitTS, timestamp, r.Limit, SubRawResolution, true, r.IncludeLastBorder)
 	}
 	var rows []fetcher.Row
 	for i := range resRows {

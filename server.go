@@ -227,10 +227,14 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 			prefixTypes = kvstore.PrefixMessageDataMetric
 		}
 
-		cursorTimestamp, _, cursorErr := query.Query.ParseCursor()
+		cursorTimestamp, cursorSkipKeyIndex, cursorErr := query.Query.ParseCursor()
 		if cursorErr != nil {
 			errorResponse(c, "cannot parse cursor")
 			return
+		}
+		var cursorSkipKey []byte
+		if len(query.Query.MetricKeys) > cursorSkipKeyIndex {
+			cursorSkipKey = []byte(query.Query.MetricKeys[cursorSkipKeyIndex])
 		}
 
 		resource := kvstore.StoreResourceImpl{
@@ -244,46 +248,61 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 		for i := range query.Query.MetricKeys {
 			keys = append(keys, []byte(query.Query.MetricKeys[i]))
 		}
-		switch query.Query.Sort {
-		default: // desc
-			storeFetcher = fetcher.NewFetcher(keys, query.Query.Upper, query.Query.Lower, false, &resource)
-		case "asc":
-			storeFetcher = fetcher.NewFetcher(keys, query.Query.Upper, query.Query.Lower, true, &resource)
+
+		lower := query.Query.Lower
+		upper := query.Query.Upper
+		if cursorTimestamp != 0 {
+			if reverse && upper >= cursorTimestamp { //desc
+				upper = cursorTimestamp
+			} else if !reverse && lower <= cursorTimestamp { // asc
+				lower = cursorTimestamp
+			}
+		}
+
+		switch reverse {
+		case true: // desc
+			storeFetcher = fetcher.NewFetcher(keys, upper, lower, false, &resource)
+			resource.LimitTS = lower
+		case false:
+			storeFetcher = fetcher.NewFetcher(keys, lower, upper, true, &resource)
+			resource.LimitTS = upper
 		}
 
 		var rows []fetcher.Row
 		var fetchErr error
 		filteredRes := make([]kvstore.SingleMetricResponseRow, 0)
 		var lastTimestamp int64 = 0
+		var lastMetricKey *[]byte
 		skipCount := 0
+		foundSkipKey := false
 
+		// If the cursor is specification and reverse, the first request is taken as `reqTimestamp <= rowTimestamp`.
+		if cursorTimestamp != 0 && reverse {
+			resource.IncludeLastBorder = true
+		}
 		fetchErr = storeFetcher.PreFetch()
+		resource.IncludeLastBorder = false
+
 		if fetchErr != nil {
 			errorResponse(c, "fetch error")
 			return
 		}
 		for len(filteredRes) < query.Query.Limit && skipCount < query.Query.MaxSkip {
-			includeLastBorder := false
-			lower := query.Query.Lower
-			upper := query.Query.Upper
-			if cursorTimestamp != 0 {
-				if reverse && upper >= cursorTimestamp { //desc
-					upper = cursorTimestamp
-				} else if !reverse && lower <= cursorTimestamp { // asc
-					lower = cursorTimestamp
-					includeLastBorder = true // skip first row
-				}
-			}
 			limit := query.Query.Limit - len(filteredRes) + query.Query.MaxSkip/2
 
-			resource.IncludeLastBorder = includeLastBorder // todo
 			rows, fetchErr = storeFetcher.Next(limit)
 			if fetchErr != nil {
 				errorResponse(c, "fetch error")
 				return
 			}
 
-			for _, row := range rows {
+			for _, row := range rows { // filtering & collect response rows
+				if cursorTimestamp == row.TimeStamp && !foundSkipKey { // cursor process
+					if bytes.Equal(cursorSkipKey, row.MetricKey) {
+						foundSkipKey = true
+					}
+					continue
+				}
 				condition, err := query.FilterRow(row.Value)
 				if err != nil {
 					errorResponse(c, "query error"+err.Error())
@@ -299,15 +318,22 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 					skipCount += 1
 				}
 				lastTimestamp = row.TimeStamp
+				lastMetricKey = &row.MetricKey
 
 				if len(filteredRes) >= query.Query.Limit || skipCount >= query.Query.MaxSkip {
 					break
 				}
 			}
-			cursorTimestamp = lastTimestamp
 
 			if len(rows) < limit { // If len does not reach limit, there is no next row
 				break
+			}
+		}
+
+		resCursorMetricKey := 0
+		for i := range query.Query.MetricKeys {
+			if lastMetricKey != nil && bytes.Equal([]byte(query.Query.MetricKeys[i]), *lastMetricKey) {
+				resCursorMetricKey = i
 			}
 		}
 
@@ -315,7 +341,7 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 			MetricId:    string(targetId),
 			Rows:        filteredRes,
 			QueryTimeNs: time.Now().UnixNano() - c.GetInt64("req"),
-			Cursor:      strconv.FormatInt(lastTimestamp, 10) + "," + strconv.Itoa(0),
+			Cursor:      strconv.FormatInt(lastTimestamp, 10) + "," + strconv.Itoa(resCursorMetricKey),
 		}
 		c.JSON(200, res)
 	})

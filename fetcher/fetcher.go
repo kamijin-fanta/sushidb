@@ -57,6 +57,9 @@ func (f *Fetcher) PreFetch() error {
 				return err
 			}
 			item.Rows = append(item.Rows, rows...)
+			if len(item.Rows) > 0 {
+				item.ReadPointTimeStamp = item.Rows[0].TimeStamp // memoize
+			}
 			if len(item.Rows) == 0 || stop {
 				item.Stop = true
 			}
@@ -80,7 +83,7 @@ func (f *Fetcher) Next(limit int) (rows []Row, error error) {
 				}
 				item.Rows = rows
 				if len(item.Rows) > 0 {
-					item.ReadPointTimeStamp = item.Rows[0].TimeStamp
+					item.ReadPointTimeStamp = item.Rows[0].TimeStamp // memoize
 				}
 				item.ReadPointIndex = 0
 				if len(item.Rows) == 0 || stop {
