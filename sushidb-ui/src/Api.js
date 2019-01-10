@@ -49,14 +49,20 @@ export function fetchStoreList() {
 
 export function useResource(fn, defaultValue, dependency = []) {
   const [body, setBody] = React.useState(defaultValue);
+  const [error, setError] = React.useState();
   const [isLoading, setLoading] = React.useState(false);
 
   async function refresh() {
-    setLoading(true);
-    const res = await fn();
-    const json = await res.json();
-    setBody(json);
-    setLoading(false);
+    try {
+      setError();
+      setLoading(true);
+      const res = await fn();
+      const json = await res.json();
+      setBody(json);
+      setLoading(false);
+    } catch (e) {
+      setError(e);
+    }
   }
   async function clearAndRefresh() {
     setBody(defaultValue);
@@ -71,6 +77,7 @@ export function useResource(fn, defaultValue, dependency = []) {
   return {
     body,
     refresh,
-    isLoading
+    isLoading,
+    error
   };
 }
