@@ -22,7 +22,7 @@ var defs = []MockDefined{
 
 type MockResourceImpl struct{}
 
-func (r MockResourceImpl) fetch(key []byte, timestamp int64, asc bool) (rows []Row, error error) {
+func (r *MockResourceImpl) Fetch(key []byte, timestamp int64, asc bool) (rows []Row, stop bool, error error) {
 	limit := 5
 	for _, def := range defs {
 		if bytes.Compare([]byte(def.MetricKey), key) == 0 {
@@ -61,7 +61,7 @@ func (r MockResourceImpl) fetch(key []byte, timestamp int64, asc bool) (rows []R
 			break
 		}
 	}
-	return rows, nil
+	return rows, limit > len(rows), nil
 }
 
 func PrintRows(rows []Row) {
@@ -71,34 +71,46 @@ func PrintRows(rows []Row) {
 }
 
 func TestMockResource(t *testing.T) {
-	var mockResource Resource = MockResourceImpl{}
-	rows, err := mockResource.Fetch([]byte("aaa"), 0, true)
+	var mockResource Resource = &MockResourceImpl{}
+	rows, stop, err := mockResource.Fetch([]byte("aaa"), 0, true)
 	assert.Nil(t, err)
+	assert.False(t, stop)
 	assert.Equal(t, rows[0].TimeStamp, int64(1000))
 
-	rows, err = mockResource.Fetch([]byte("aaa"), 1120, true)
+	rows, stop, err = mockResource.Fetch([]byte("aaa"), 1120, true)
 	assert.Nil(t, err)
+	assert.False(t, stop)
 	assert.Equal(t, rows[0].TimeStamp, int64(1120))
 
-	rows, err = mockResource.Fetch([]byte("aaa"), 1130, true)
+	rows, stop, err = mockResource.Fetch([]byte("aaa"), 1130, true)
 	assert.Nil(t, err)
+	assert.False(t, stop)
 	assert.Equal(t, rows[0].TimeStamp, int64(1140))
 
-	rows, err = mockResource.Fetch([]byte("aaa"), 0, false)
+	// last
+	rows, stop, err = mockResource.Fetch([]byte("aaa"), 1480, true)
 	assert.Nil(t, err)
+	assert.True(t, stop)
+	assert.Equal(t, len(rows), 2)
+
+	rows, stop, err = mockResource.Fetch([]byte("aaa"), 0, false)
+	assert.Nil(t, err)
+	assert.False(t, stop)
 	assert.Equal(t, rows[0].TimeStamp, int64(1500))
 
-	rows, err = mockResource.Fetch([]byte("aaa"), 1380, false)
+	rows, stop, err = mockResource.Fetch([]byte("aaa"), 1380, false)
 	assert.Nil(t, err)
+	assert.False(t, stop)
 	assert.Equal(t, rows[0].TimeStamp, int64(1360))
 
-	rows, err = mockResource.Fetch([]byte("aaa"), 1370, false)
+	rows, stop, err = mockResource.Fetch([]byte("aaa"), 1370, false)
 	assert.Nil(t, err)
+	assert.False(t, stop)
 	assert.Equal(t, rows[0].TimeStamp, int64(1360))
 }
 
 func ExampleFetchSingleAsc() {
-	var mockResource Resource = MockResourceImpl{}
+	var mockResource Resource = &MockResourceImpl{}
 	requestKeys := [][]byte{
 		[]byte("aaa"),
 	}
@@ -115,7 +127,7 @@ func ExampleFetchSingleAsc() {
 }
 
 func ExampleFetchMultiAsc() {
-	var mockResource Resource = MockResourceImpl{}
+	var mockResource Resource = &MockResourceImpl{}
 	requestKeys := [][]byte{
 		[]byte("aaa"),
 		[]byte("bbb"),
@@ -134,7 +146,7 @@ func ExampleFetchMultiAsc() {
 }
 
 func ExampleFetchAscLimited() {
-	var mockResource Resource = MockResourceImpl{}
+	var mockResource Resource = &MockResourceImpl{}
 	requestKeys := [][]byte{
 		[]byte("aaa"),
 		[]byte("bbb"),
@@ -154,7 +166,7 @@ func ExampleFetchAscLimited() {
 }
 
 func ExampleFetchSingleDesc() {
-	var mockResource Resource = MockResourceImpl{}
+	var mockResource Resource = &MockResourceImpl{}
 	requestKeys := [][]byte{
 		[]byte("aaa"),
 	}
@@ -171,7 +183,7 @@ func ExampleFetchSingleDesc() {
 }
 
 func ExampleFetchMultiDesc() {
-	var mockResource Resource = MockResourceImpl{}
+	var mockResource Resource = &MockResourceImpl{}
 	requestKeys := [][]byte{
 		[]byte("ccc"),
 		[]byte("aaa"),

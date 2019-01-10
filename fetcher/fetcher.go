@@ -17,7 +17,7 @@ type FetchItem struct {
 }
 
 type Resource interface {
-	Fetch(key []byte, timestamp int64, asc bool) (rows []Row, error error)
+	Fetch(key []byte, timestamp int64, asc bool) (rows []Row, stop bool, error error)
 }
 
 type Fetcher struct {
@@ -57,7 +57,7 @@ func (f *Fetcher) Next(limit int) (rows []Row, error error) {
 			item := &f.Items[idx]
 			// Fetch next items
 			if item.Stop == false && len(item.Rows) <= item.ReadPointIndex {
-				rows, err := f.Resource.Fetch(item.MetricKey, item.ReadPointTimeStamp, f.Asc)
+				rows, stop, err := f.Resource.Fetch(item.MetricKey, item.ReadPointTimeStamp, f.Asc)
 				if err != nil {
 					return nil, err
 				}
@@ -66,12 +66,12 @@ func (f *Fetcher) Next(limit int) (rows []Row, error error) {
 					item.ReadPointTimeStamp = item.Rows[0].TimeStamp
 				}
 				item.ReadPointIndex = 0
-				if len(rows) == 0 {
+				if len(item.Rows) == 0 || stop {
 					item.Stop = true
 				}
 			}
 
-			if item.Stop == false && (near == nil ||
+			if len(item.Rows) > item.ReadPointIndex && (near == nil ||
 				(f.Asc && near.ReadPointTimeStamp > item.ReadPointTimeStamp) ||
 				(!f.Asc && near.ReadPointTimeStamp < item.ReadPointTimeStamp)) {
 				near = item
