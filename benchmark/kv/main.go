@@ -170,9 +170,7 @@ func WriteBenchmark(data chan BenchmarkInput, stats chan Status, done chan struc
 	}
 	driver := tikv.Driver{}
 	txClient, err := driver.Open("tikv://" + pdAddress)
-
 	defer rawClient.Close()
-	defer txClient.Close()
 
 	// main loop
 	for row := range data {

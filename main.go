@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/pingcap/pd/client"
@@ -41,7 +42,10 @@ func main() {
 	fmt.Printf("cluster ID: %d\n", rawClient.ClusterID())
 
 	r := gin.Default()
+	pprof.Register(r) // enabled /debug/pprof/
+
 	ApiServer(r, &store)
 	UiServer(r)
+
 	r.Run()
 }

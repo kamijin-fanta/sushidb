@@ -43,6 +43,7 @@ const (
 	PrefixSingleValueMetric PrefixTypes = iota
 	PrefixMessageDataMetric
 	PrefixKeysMetric
+	PrefixKnown = 1000000000
 )
 
 func EncodeKey(metricType PrefixTypes, metricId []byte, subtype int8, time int64) (result []byte) {
@@ -84,7 +85,7 @@ func DecodeKey(key []byte) (metricType PrefixTypes, metricId []byte, subtype int
 	case "k1":
 		metricType = PrefixKeysMetric
 	default:
-		log.Fatalf("undefined metric type: %s\n", string(prefix))
+		return PrefixKnown, metricId, subtype, time
 	}
 	timeLength := 8
 	timeBuffer := key[length-timeLength:]
@@ -339,7 +340,7 @@ func ApiServer(r *gin.Engine, store *Store) {
 			limit := query.Query.Limit - len(filteredRes) + query.Query.MaxSkip/2
 
 			resource.IncludeLastBorder = includeLastBorder // todo
-			rows, fetchErr = storeFetcher.Next(100)
+			rows, fetchErr = storeFetcher.Next(limit)
 			if fetchErr != nil {
 				errorResponse(c, "fetch error")
 				return
