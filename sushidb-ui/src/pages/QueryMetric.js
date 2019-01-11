@@ -136,18 +136,19 @@ function editorDidMount(editor) {
 
 export function QueryMetric(props) {
   const metricType = props.match.params.type;
-  const metricKey = props.match.params.key;
-  const initial = `{\n  "filters": [\n    \n  ]\n}`;
+  const metricKeys = props.match.params.keys
+    ? props.match.params.keys.split(",")
+    : [];
+
+  const initialObj = { metric_keys: metricKeys, filters: [] };
+  const initial = JSON.stringify(initialObj, null, 2);
   const [inputQuery, setInputQuery] = useState(initial);
   const [query, setQuery] = useState(initial);
 
   const metrics = useResource(
-    () =>
-      metricType === "message"
-        ? queryMessage(metricKey, query)
-        : querySingle(metricKey, query),
+    () => (metricType === "message" ? queryMessage(query) : querySingle(query)),
     {},
-    [metricType, metricKey, query]
+    [metricType, query]
   );
 
   const onSubmit = () => {
@@ -167,7 +168,9 @@ export function QueryMetric(props) {
 
   return (
     <div className="page query-metric">
-      <h1>Querying View</h1>
+      <h1>
+        Querying View <small>metric_type: {metricType}</small>
+      </h1>
       <MonacoEditor
         width="100%"
         height="300"

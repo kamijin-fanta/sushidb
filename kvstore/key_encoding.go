@@ -30,7 +30,7 @@ const (
 	PrefixKnown = 1000000000
 )
 
-func EncodeKey(metricType PrefixTypes, metricId []byte, subtype int8, time int64) (result []byte) {
+func EncodeKey(metricType PrefixTypes, metricKey []byte, subtype int8, time int64) (result []byte) {
 	sep := []byte("_")
 	timeBuffer := make([]byte, 8)
 	binary.BigEndian.PutUint64(timeBuffer, uint64(time))
@@ -47,10 +47,10 @@ func EncodeKey(metricType PrefixTypes, metricId []byte, subtype int8, time int64
 		panic("undefined metric Type")
 	}
 
-	// [prefix]_[metricId]_[subtype]_[time ns]
+	// [prefix]_[metricKey]_[subtype]_[time ns]
 	result = append(result, prefix[:]...)          // 2 bytes
 	result = append(result, sep...)                // 1 byte
-	result = append(result, metricId...)           // n bytes
+	result = append(result, metricKey...)          // n bytes
 	result = append(result, sep...)                // 1 byte
 	result = append(result, byte(subtype))         // 1 byte
 	result = append(result, sep...)                // 1 byte
@@ -58,7 +58,7 @@ func EncodeKey(metricType PrefixTypes, metricId []byte, subtype int8, time int64
 	log.Printf("encode key: %+v, %s", result, string(result))
 	return
 }
-func DecodeKey(key []byte) (metricType PrefixTypes, metricId []byte, subtype int8, time int64) {
+func DecodeKey(key []byte) (metricType PrefixTypes, metricKey []byte, subtype int8, time int64) {
 	length := len(key)
 	prefix := key[:2]
 	switch string(prefix) {
@@ -69,12 +69,12 @@ func DecodeKey(key []byte) (metricType PrefixTypes, metricId []byte, subtype int
 	case "k1":
 		metricType = PrefixKeysMetric
 	default:
-		return PrefixKnown, metricId, subtype, time
+		return PrefixKnown, metricKey, subtype, time
 	}
 	timeLength := 8
 	timeBuffer := key[length-timeLength:]
 	time = int64(binary.BigEndian.Uint64(timeBuffer))
 	subtype = int8(key[length-timeLength-2])
-	metricId = key[3 : length-timeLength-3]
+	metricKey = key[3 : length-timeLength-3]
 	return
 }

@@ -17,23 +17,25 @@ export function fetchKeys() {
   return fetch(`${API_BASE}/keys`);
 }
 
-export function fetchSingleMetric(metricId, options = {}) {
-  return fetch(`${API_BASE}/metric/single/${metricId}${queryString(options)}`);
+export function fetchSingleMetric(metricKey, options = {}) {
+  return fetch(`${API_BASE}/metric/single/${metricKey}${queryString(options)}`);
 }
 
-export function fetchMessageMetric(metricId, options = {}) {
-  return fetch(`${API_BASE}/metric/message/${metricId}${queryString(options)}`);
+export function fetchMessageMetric(metricKey, options = {}) {
+  return fetch(
+    `${API_BASE}/metric/message/${metricKey}${queryString(options)}`
+  );
 }
 
-export function queryMessage(metricId, data = {}, options = {}) {
-  return fetch(`${API_BASE}/query/message/${metricId}${queryString(options)}`, {
+export function queryMessage(data = {}, options = {}) {
+  return fetch(`${API_BASE}/query/message${queryString(options)}`, {
     method: "POST",
     body: data
   });
 }
 
-export function querySingle(metricId, data = "", options = {}) {
-  return fetch(`${API_BASE}/query/single/${metricId}${queryString(options)}`, {
+export function querySingle(data = "", options = {}) {
+  return fetch(`${API_BASE}/query/single${queryString(options)}`, {
     method: "POST",
     body: data
   });

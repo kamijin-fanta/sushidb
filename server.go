@@ -37,9 +37,9 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 	})
 
 	/********** PostMetrics **********/
-	r.POST("/metric/:type/:id/:time", func(c *gin.Context) {
-		metricId := c.Param("id")
-		metricIdBytes := []byte(metricId)
+	r.POST("/metric/:type/:key/:time", func(c *gin.Context) {
+		metricKey := c.Param("key")
+		metricKeyBytes := []byte(metricKey)
 		metricTimeStr := c.Param("time")
 
 		metricTime, err := strconv.ParseInt(metricTimeStr, 10, 64)
@@ -77,10 +77,10 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 			if !success {
 				errorResponse(c, "invalid body. You can post a numerical value.")
 			}
-			writeError = store.PutSingleMetric(metricIdBytes, metricTime, kvstore.SubRawResolution, floatValue)
+			writeError = store.PutSingleMetric(metricKeyBytes, metricTime, kvstore.SubRawResolution, floatValue)
 			break
 		case MetricMessage:
-			writeError = store.PutMessageMetric(metricIdBytes, metricTime, kvstore.SubRawResolution, receiveJson)
+			writeError = store.PutMessageMetric(metricKeyBytes, metricTime, kvstore.SubRawResolution, receiveJson)
 			break
 		}
 
@@ -170,7 +170,6 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 		}
 
 		res := MetricResponse{
-			MetricId:    string(targetId),
 			Rows:        rows,
 			QueryTimeNs: time.Now().UnixNano() - c.GetInt64("req"),
 		}
@@ -178,7 +177,7 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 	})
 
 	/********** Advanced Query Metrics **********/
-	r.POST("/query/:type/:id", func(c *gin.Context) {
+	r.POST("/query/:type", func(c *gin.Context) {
 		c.Set("req", time.Now().UnixNano())
 
 		metricType, err := parseMetricType(c)
@@ -186,13 +185,6 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 			errorResponse(c, "bad metric type")
 			return
 		}
-
-		targetIdStr := c.Param("id")
-		if targetIdStr == "" {
-			errorResponse(c, "invalid metric id")
-			return
-		}
-		targetId := []byte(targetIdStr)
 
 		buf := new(bytes.Buffer)
 		_, err = io.Copy(buf, c.Request.Body)
@@ -244,7 +236,6 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 		}
 		var storeFetcher fetcher.Fetcher
 		var keys [][]byte
-		// keys = append(keys, targetId) // todo multi
 		for i := range query.Query.MetricKeys {
 			keys = append(keys, []byte(query.Query.MetricKeys[i]))
 		}
@@ -338,7 +329,6 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 		}
 
 		res := MetricResponse{
-			MetricId:    string(targetId),
 			Rows:        filteredRes,
 			QueryTimeNs: time.Now().UnixNano() - c.GetInt64("req"),
 			Cursor:      strconv.FormatInt(lastTimestamp, 10) + "," + strconv.Itoa(resCursorMetricKey),
@@ -389,7 +379,6 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 }
 
 type MetricResponse struct {
-	MetricId    string                            `json:"metric_id"`
 	Rows        []kvstore.SingleMetricResponseRow `json:"rows"`
 	QueryTimeNs int64                             `json:"query_time_ns"`
 	Cursor      string                            `json:"cursor"`

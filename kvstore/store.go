@@ -21,8 +21,8 @@ func New(kvClient tikv.RawKVClient, pdClient pd.Client) Store {
 }
 
 type KeyResponseRow struct {
-	MetricId string `json:"metric_id"`
-	Type     string `json:"type"`
+	MetricKey string `json:"metric_id"`
+	Type      string `json:"type"`
 }
 
 func (s *Store) ClusterID() uint64 {
@@ -39,7 +39,7 @@ func (s *Store) FetchKeys(start []byte, limit int) ([]KeyResponseRow, error) {
 	}
 
 	for i := range keys {
-		metricType, metricId, subtypeId, _ := DecodeKey(keys[i])
+		metricType, MetricKey, subtypeId, _ := DecodeKey(keys[i])
 		if metricType != PrefixKeysMetric {
 			break
 		}
@@ -53,8 +53,8 @@ func (s *Store) FetchKeys(start []byte, limit int) ([]KeyResponseRow, error) {
 			break
 		}
 		responseKeys = append(responseKeys, KeyResponseRow{
-			MetricId: string(metricId),
-			Type:     subtype,
+			MetricKey: string(MetricKey),
+			Type:      subtype,
 		})
 	}
 	return responseKeys, nil
@@ -66,14 +66,14 @@ type SingleMetricResponseRow struct {
 	MetricKey string      `json:"metric_key"`
 }
 
-func (s *Store) FetchSingleMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
-	return s.FetchMetric(PrefixSingleValueMetric, metricId, lower, upper, limit, resolution, reverse, includeUpperBorder)
+func (s *Store) FetchSingleMetric(MetricKey []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
+	return s.FetchMetric(PrefixSingleValueMetric, MetricKey, lower, upper, limit, resolution, reverse, includeUpperBorder)
 }
-func (s *Store) FetchMessageMetric(metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
-	return s.FetchMetric(PrefixMessageDataMetric, metricId, lower, upper, limit, resolution, reverse, includeUpperBorder)
+func (s *Store) FetchMessageMetric(MetricKey []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
+	return s.FetchMetric(PrefixMessageDataMetric, MetricKey, lower, upper, limit, resolution, reverse, includeUpperBorder)
 }
 
-func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
+func (s *Store) FetchMetric(prefix PrefixTypes, metricKey []byte, lower int64, upper int64, limit int, resolution int8, reverse bool, includeUpperBorder bool) ([]SingleMetricResponseRow, error) {
 	var keys [][]byte
 	var values [][]byte
 	var err error
@@ -81,13 +81,13 @@ func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, up
 	var responseRows []SingleMetricResponseRow
 
 	if reverse {
-		startKey := EncodeKey(prefix, metricId, resolution, upper)
+		startKey := EncodeKey(prefix, metricKey, resolution, upper)
 		if includeUpperBorder {
 			startKey = append(startKey, 0)
 		}
 		keys, values, err = s.rawKvClient.ReverseScan(startKey, limit)
 	} else {
-		startKey := EncodeKey(prefix, metricId, resolution, lower)
+		startKey := EncodeKey(prefix, metricKey, resolution, lower)
 		keys, values, err = s.rawKvClient.Scan(startKey, limit)
 	}
 	if err != nil {
@@ -95,8 +95,8 @@ func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, up
 	}
 
 	for i := range keys {
-		metricType, respondMetricId, respondResolution, time := DecodeKey(keys[i])
-		if metricType != prefix || !bytes.Equal(respondMetricId, metricId) || resolution != respondResolution {
+		metricType, respondMetricKey, respondResolution, time := DecodeKey(keys[i])
+		if metricType != prefix || !bytes.Equal(respondMetricKey, metricKey) || resolution != respondResolution {
 			break
 		}
 		if (!reverse && (!includeUpperBorder && (time >= upper) || includeUpperBorder && (time > upper))) ||
@@ -110,24 +110,25 @@ func (s *Store) FetchMetric(prefix PrefixTypes, metricId []byte, lower int64, up
 			break
 		}
 		responseRows = append(responseRows, SingleMetricResponseRow{
-			Time:  time,
-			Value: unpacked,
+			Time:      time,
+			Value:     unpacked,
+			MetricKey: string(metricKey),
 		})
 	}
 
 	return responseRows, err
 }
 
-func (s *Store) PutSingleMetric(metricId []byte, time int64, resolution int8, value float64) error {
+func (s *Store) PutSingleMetric(MetricKey []byte, time int64, resolution int8, value float64) error {
 	packedValue, _ := msgpack.Marshal(value)
-	return s.PutMetric(PrefixSingleValueMetric, metricId, time, resolution, packedValue)
+	return s.PutMetric(PrefixSingleValueMetric, MetricKey, time, resolution, packedValue)
 }
-func (s *Store) PutMessageMetric(metricId []byte, time int64, resolution int8, object interface{}) error {
+func (s *Store) PutMessageMetric(MetricKey []byte, time int64, resolution int8, object interface{}) error {
 	packedValue, _ := msgpack.Marshal(object)
-	return s.PutMetric(PrefixMessageDataMetric, metricId, time, resolution, packedValue)
+	return s.PutMetric(PrefixMessageDataMetric, MetricKey, time, resolution, packedValue)
 }
 
-func (s *Store) PutMetric(prefix PrefixTypes, metricId []byte, time int64, resolution int8, body []byte) error {
+func (s *Store) PutMetric(prefix PrefixTypes, MetricKey []byte, time int64, resolution int8, body []byte) error {
 	var subType int8
 	switch prefix {
 	case PrefixSingleValueMetric:
@@ -141,14 +142,14 @@ func (s *Store) PutMetric(prefix PrefixTypes, metricId []byte, time int64, resol
 	}
 
 	// write value
-	key := EncodeKey(prefix, []byte(metricId), resolution, time)
+	key := EncodeKey(prefix, []byte(MetricKey), resolution, time)
 	writeValueError := s.rawKvClient.Put(key, body)
 	if writeValueError != nil {
 		return writeValueError
 	}
 
 	// write keys info
-	keysInfoMetricKey := EncodeKey(PrefixKeysMetric, []byte(metricId), subType, 0)
+	keysInfoMetricKey := EncodeKey(PrefixKeysMetric, []byte(MetricKey), subType, 0)
 	writeKeyInfoError := s.rawKvClient.Put(keysInfoMetricKey, []byte{0})
 	if writeKeyInfoError != nil {
 		return writeKeyInfoError

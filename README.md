@@ -113,10 +113,10 @@ $ chrome localhost:3000/ui
 ## キー設計
 
 - フォーマット
-  - `[prefix 2bytes]_[metricId some bytes]_[subtype 1 byte]_[time ns 8 bytes]`
+  - `[prefix 2bytes]_[metricKey some bytes]_[subtype 1 byte]_[time ns 8 bytes]`
   - 各項目はアンダーバー(0x5f)で区切る
 - prefix: 値の種別・バージョンが入る
-- metricId: キー名などが入る
+- metricKey: キー名などが入る
 - subtype: 圧縮後の解像度など、該当のキーへの補助的な種別が入る
 - time: ビッグエンディアンのint64値として、ナノ秒を格納する
 
