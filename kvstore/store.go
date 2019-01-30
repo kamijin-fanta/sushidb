@@ -6,6 +6,7 @@ import (
 	"github.com/kamijin-fanta/sushidb/fetcher"
 	"github.com/pingcap/pd/client"
 	"github.com/pingcap/tidb/store/tikv"
+	"github.com/pingcap/tidb/store/tikv/gcworker"
 	"github.com/vmihailenco/msgpack"
 	"io/ioutil"
 	"net/http"
@@ -14,10 +15,17 @@ import (
 type Store struct {
 	rawKvClient tikv.RawKVClient
 	pbClient    pd.Client
+	storage     tikv.Storage
 }
 
-func New(kvClient tikv.RawKVClient, pdClient pd.Client) Store {
-	return Store{kvClient, pdClient}
+func New(kvClient tikv.RawKVClient, pdClient pd.Client, storage tikv.Storage) Store {
+	return Store{kvClient, pdClient, storage}
+}
+
+func (s *Store) StartGc() error {
+	worker, err := gcworker.NewGCWorker(s.storage, s.pbClient)
+	worker.Start()
+	return err
 }
 
 type KeyResponseRow struct {

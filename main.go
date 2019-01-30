@@ -35,7 +35,14 @@ func main() {
 	}
 	defer pdClient.Close()
 
-	store := kvstore.New(*rawClient, pdClient)
+	driver := tikv.Driver{}
+	txnStorage, err := driver.Open("tikv://" + pdAddress)
+	if err != nil {
+		panic(err)
+	}
+	defer txnStorage.Close()
+
+	store := kvstore.New(*rawClient, pdClient, txnStorage.(tikv.Storage))
 
 	fmt.Printf("cluster ID: %d\n", rawClient.ClusterID())
 
@@ -46,4 +53,8 @@ func main() {
 	UiServer(r)
 
 	r.Run()
+	err = store.StartGc()
+	if err != nil {
+		panic(err)
+	}
 }

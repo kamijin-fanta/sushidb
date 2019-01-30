@@ -23,7 +23,6 @@ export function SingleMetric(props) {
       metrics.body.rows.concat().sort((a, b) => a.time - b.time),
     [metrics]
   );
-  console.log("metrics.body.rows", metrics.body.rows);
   return (
     <div className="page single-metric">
       <h1>Single Metric View</h1>
