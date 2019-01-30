@@ -1,8 +1,8 @@
 import React from "react";
 
-import { Icon } from "@blueprintjs/core";
+import { Icon, Button } from "@blueprintjs/core";
 import { NavLink } from "react-router-dom";
-import { fetchKeys, useResource } from "../Api";
+import { fetchKeys, useResource, deleteMetric } from "../Api";
 
 const styles = {
   td: {
@@ -23,6 +23,15 @@ function genQueryLink(key) {
 
 export function Keys() {
   const keys = useResource(() => fetchKeys(), []);
+
+  async function onDeleteClick(key) {
+    if (
+      window.confirm(`DELETE THIS KEY \ntype:${key.type} id:${key.metric_id}`)
+    ) {
+      await deleteMetric(key.type, key.metric_id);
+      keys.refresh();
+    }
+  }
 
   return (
     <div className="page keys">
@@ -55,6 +64,13 @@ export function Keys() {
                   <Icon icon="search" />
                   <span className="bp3-button-text">Query Metric</span>
                 </NavLink>
+                <Button
+                  minimal={true}
+                  icon="delete"
+                  onClick={() => onDeleteClick(key)}
+                >
+                  Delete
+                </Button>
               </td>
             </tr>
           ))}

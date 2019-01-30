@@ -41,6 +41,15 @@ export function querySingle(data = "", options = {}) {
   });
 }
 
+export function deleteMetric(type, metricKey, options = {}) {
+  return fetch(
+    `${API_BASE}/metric/${type}/${metricKey}${queryString(options)}`,
+    {
+      method: "DELETE"
+    }
+  );
+}
+
 /********** PD API **********/
 export function fetchPdList() {
   return fetch(`${API_BASE}/pd/`);

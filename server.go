@@ -176,6 +176,36 @@ func ApiServer(r *gin.Engine, store *kvstore.Store) {
 		c.JSON(200, res)
 	})
 
+	/********** Delete Metrics **********/
+	r.DELETE("/metric/:type/:id", func(c *gin.Context) {
+		start := time.Now().UnixNano()
+		metricType, err := parseMetricType(c)
+		if err != nil {
+			errorResponse(c, "bad metric type")
+			return
+		}
+		var prefixTypes kvstore.PrefixTypes
+		switch metricType {
+		case MetricSingle:
+			prefixTypes = kvstore.PrefixSingleValueMetric
+		case MetricMessage:
+			prefixTypes = kvstore.PrefixMessageDataMetric
+		}
+
+		targetIdStr := c.Param("id")
+		if targetIdStr == "" {
+			errorResponse(c, "invalid metric id")
+			return
+		}
+		targetId := []byte(targetIdStr)
+
+		count, err := store.DeleteMetricKey(prefixTypes, targetId)
+		c.JSON(200, gin.H{
+			"count": count,
+			"query_time_ns": time.Now().UnixNano() - start,
+		})
+	})
+
 	/********** Advanced Query Metrics **********/
 	r.POST("/query/:type", func(c *gin.Context) {
 		c.Set("req", time.Now().UnixNano())

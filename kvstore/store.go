@@ -166,6 +166,59 @@ func (s *Store) PutMetric(prefix PrefixTypes, MetricKey []byte, time int64, reso
 	return nil
 }
 
+func (s *Store) DeleteMetricKey(prefix PrefixTypes, metricKey []byte) (int, error) {
+	start := EncodeKey(prefix, metricKey, 0, 0)
+	deleteCount := 0
+	batchSize := 1000
+
+	loop := true
+	for loop {
+		var deleteTargets [][]byte
+		keys, _, err := s.rawKvClient.Scan(start, batchSize)
+		if err != nil {
+			return deleteCount, err
+		}
+		if len(keys) != batchSize {
+			loop = false
+		}
+
+		for i := range keys {
+			metricType, MetricKey, _, _ := DecodeKey(keys[i])
+			if metricType != prefix || !bytes.Equal(MetricKey, metricKey) {
+				loop = false
+				break
+			}
+			deleteTargets = append(deleteTargets, keys[i])
+		}
+
+		err = s.rawKvClient.BatchDelete(deleteTargets)
+		if err != nil {
+			return deleteCount, err
+		}
+		deleteCount += len(deleteTargets)
+	}
+
+	var subType int8
+	switch prefix {
+	case PrefixSingleValueMetric:
+		subType = SubSingleKeys
+		break
+	case PrefixMessageDataMetric:
+		subType = SubMessageKeys
+		break
+	default:
+		panic("undefined prefix type")
+	}
+
+	keysInfoMetricKey := EncodeKey(PrefixKeysMetric, metricKey, subType, 0)
+	err := s.rawKvClient.Delete(keysInfoMetricKey)
+	if err != nil {
+		return deleteCount, err
+	}
+
+	return deleteCount, nil
+}
+
 type StoreResourceImpl struct {
 	PrefixTypes       PrefixTypes
 	Store             *Store
